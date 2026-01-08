@@ -1,0 +1,7 @@
+{
+  "name": "Shop Finder",
+  "description": "Find anything, anywhere. The real-time utility for discovering open facilities, shops, and services.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
