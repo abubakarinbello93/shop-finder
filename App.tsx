@@ -1,3 +1,22 @@
+// ADD THESE AT THE TOP
+import { initializeApp } from "firebase/app";
+import { getAI, getGenerativeModel } from "firebase/ai";
+
+// Your Firebase configuration (Get this from Firebase Console > Project Settings)
+const firebaseConfig = {
+  apiKey: "AIza...", 
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.firebasestorage.app",
+  messagingSenderId: "123456789",
+  appId: "1:12345:web:abcde"
+};
+
+// Initialize Firebase and AI (Outside the component)
+const app = initializeApp(firebaseConfig);
+const ai = getAI(app);
+const model = getGenerativeModel(ai, { model: "gemini-1.5-flash" });
+
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
