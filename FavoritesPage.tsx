@@ -11,9 +11,11 @@ interface FavoritesPageProps {
   onLogout: () => void;
   onToggleFavorite: (id: string) => void;
   onUpdateShop: (id: string, updates: Partial<Shop>) => void;
+  // Added onAddComment to prop interface to fix App.tsx error
+  onAddComment: (shopId: string, text: string) => void;
 }
 
-const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggleFavorite, onUpdateShop }) => {
+const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggleFavorite, onUpdateShop, onAddComment }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const navigate = useNavigate();
@@ -101,6 +103,9 @@ const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggle
           isFavorite={true}
           onClose={() => setSelectedShop(null)} 
           onToggleFavorite={onToggleFavorite}
+          // Added comments and onAddComment to allow facility updates view/interaction
+          comments={state.comments}
+          onAddComment={onAddComment}
         />
       )}
     </Layout>

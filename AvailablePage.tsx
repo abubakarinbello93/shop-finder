@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, CheckCircle, Package, Store, ArrowLeft, Navigation, MapPin, Filter, X } from 'lucide-react';
+import { Search, CheckCircle, Package, ArrowLeft, Navigation, MapPin, X, Loader2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { AppState, Shop } from '../types';
 import ShopDetailModal from '../components/ShopDetailModal';
@@ -31,28 +31,37 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [locStatus, setLocStatus] = useState<'idle' | 'fixing' | 'ready' | 'error'>('idle');
   const navigate = useNavigate();
   const { currentUser, shops } = state;
   const userShop = shops.find(s => s.id === currentUser?.shopId);
 
+  // Auto-capture location
+  useEffect(() => {
+    handleCaptureLocation();
+  }, []);
+
   const handleCaptureLocation = () => {
     if (isCapturing) return;
     setIsCapturing(true);
+    setLocStatus('fixing');
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
           setIsCapturing(false);
+          setLocStatus('ready');
         },
         () => {
           setIsCapturing(false);
-          alert("Could not access location. Please check browser permissions.");
+          setLocStatus('error');
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     } else {
       setIsCapturing(false);
-      alert("Geolocation is not supported by your browser.");
+      setLocStatus('error');
     }
   };
 
@@ -62,8 +71,6 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
 
     shops.forEach(s => {
       if (!s.isOpen) return;
-      
-      // Category filter
       if (selectedCategory && s.type !== selectedCategory) return;
 
       (s.items || []).forEach(item => {
@@ -93,23 +100,19 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
       <div className="mb-8">
         <button 
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 text-blue-700 font-black mb-4 hover:gap-3 transition-all"
+          className="flex items-center gap-2 text-indigo-700 font-black mb-4 hover:gap-3 transition-all"
         >
-          <ArrowLeft className="h-5 w-5" /> Back to Dashboard
+          <ArrowLeft className="h-5 w-5" /> Dashboard
         </button>
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-black text-gray-900 tracking-tight uppercase leading-none">Discover</h1>
-            <p className="text-gray-500 font-bold mt-2 italic text-sm">Find anything, anywhere</p>
+            <p className="text-gray-500 font-bold mt-2 italic text-sm">Real-time availability near you</p>
           </div>
-          <button 
-            onClick={handleCaptureLocation}
-            disabled={isCapturing}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black transition-all shadow-md ${userLocation ? 'bg-green-600 text-white' : 'bg-white text-blue-700 border border-blue-100 hover:bg-blue-50'}`}
-          >
-            {isCapturing ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" /> : <Navigation className="h-4 w-4" />}
-            {isCapturing ? 'Locating...' : (userLocation ? 'Proximity Sorted' : 'Sort by Distance')}
-          </button>
+          <div className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black transition-all border ${locStatus === 'ready' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
+             {locStatus === 'fixing' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
+             {locStatus === 'ready' ? 'Proximity Filter Active' : (locStatus === 'fixing' ? 'Syncing GPS...' : 'GPS Offline')}
+          </div>
         </div>
       </div>
 
@@ -120,7 +123,7 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
           </div>
           <input 
             type="text"
-            className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent rounded-2xl shadow-sm focus:border-blue-700 outline-none font-bold text-lg"
+            className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent rounded-2xl shadow-sm focus:border-indigo-700 outline-none font-bold text-lg"
             placeholder="What are you looking for?"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -129,13 +132,13 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Quick Filters</h3>
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Categories</h3>
             {selectedCategory && (
               <button 
                 onClick={() => setSelectedCategory(null)}
                 className="text-[10px] font-black text-red-500 uppercase flex items-center gap-1 hover:text-red-700 transition-colors"
               >
-                Clear <X className="h-3 w-3" />
+                Reset <X className="h-3 w-3" />
               </button>
             )}
           </div>
@@ -147,8 +150,8 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
                 className={`
                   px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-2
                   ${selectedCategory === cat 
-                    ? 'bg-blue-700 text-white border-blue-700 shadow-lg shadow-blue-100' 
-                    : 'bg-white text-gray-500 border-gray-100 hover:border-blue-200'}
+                    ? 'bg-indigo-700 text-white border-indigo-700 shadow-lg shadow-indigo-100' 
+                    : 'bg-white text-gray-500 border-gray-100 hover:border-indigo-200'}
                 `}
               >
                 {cat}
@@ -159,12 +162,12 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
       </div>
 
       {discoverList.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
           {discoverList.map((res, idx) => (
             <div 
               key={idx}
               onClick={() => setSelectedShop(res.shop)}
-              className="group bg-white p-3 md:p-6 rounded-[24px] md:rounded-3xl shadow-sm border-2 border-transparent hover:border-blue-100 hover:shadow-xl transition-all flex flex-col cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300"
+              className="group bg-white p-3 md:p-6 rounded-[24px] md:rounded-3xl shadow-sm border-2 border-transparent hover:border-indigo-100 hover:shadow-xl transition-all flex flex-col cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300"
             >
               <div className="flex items-start gap-2 md:gap-4 mb-3 md:mb-4">
                 <div className="p-2 md:p-3 bg-green-50 text-green-600 rounded-xl md:rounded-2xl shrink-0">
@@ -175,8 +178,8 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
                     <h4 className="font-black text-gray-900 text-xs md:text-lg leading-tight uppercase tracking-tight truncate">{res.item.name}</h4>
                     <div className="flex items-center flex-wrap gap-1">
                       {res.distance !== null && (
-                        <span className="text-[7px] md:text-[8px] w-fit font-black bg-blue-700 text-white px-1.5 md:py-0.5 rounded-full uppercase tracking-tighter">
-                          {res.distance.toFixed(1)} KM
+                        <span className="text-[7px] md:text-[8px] w-fit font-black bg-indigo-700 text-white px-1.5 md:py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1">
+                          <MapPin className="h-2 w-2" /> {res.distance.toFixed(1)} KM
                         </span>
                       )}
                       <span className="text-[7px] md:text-[8px] font-black text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
@@ -184,7 +187,7 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
                       </span>
                     </div>
                   </div>
-                  <p className="text-[8px] md:text-[10px] font-black text-blue-700 uppercase tracking-widest mt-1 italic truncate">{res.shop.name}</p>
+                  <p className="text-[8px] md:text-[10px] font-black text-indigo-700 uppercase tracking-widest mt-1 italic truncate">{res.shop.name}</p>
                 </div>
               </div>
               <div className="mt-auto pt-2 md:pt-4 border-t border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
@@ -192,7 +195,7 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
                   <MapPin className="h-2 w-2 md:h-3 md:w-3 shrink-0" /> {res.shop.lga}
                 </div>
                 <div className="text-[7px] md:text-[10px] font-black text-green-600 uppercase tracking-widest">
-                  {res.item.time || 'NOW'}
+                  {res.item.time || 'IN STOCK'}
                 </div>
               </div>
             </div>
@@ -201,8 +204,8 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
       ) : (
         <div className="bg-white p-10 md:p-20 rounded-[40px] text-center border-2 border-dashed border-gray-100 animate-in zoom-in-95 duration-500">
            <Package className="h-10 w-10 md:h-16 md:w-16 text-gray-200 mx-auto mb-4" />
-           <p className="text-sm md:text-xl font-black text-gray-400 uppercase tracking-widest">No matching items</p>
-           <p className="text-gray-400 font-bold mt-2 text-xs md:text-sm">Try searching for products or adjusting your category filter.</p>
+           <p className="text-sm md:text-xl font-black text-gray-400 uppercase tracking-widest">No results</p>
+           <p className="text-gray-400 font-bold mt-2 text-xs md:text-sm">Try searching for other products or categories.</p>
         </div>
       )}
 

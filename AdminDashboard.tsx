@@ -74,12 +74,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
       <aside className="w-full md:w-72 bg-gray-900 text-white flex flex-col sticky top-0 h-auto md:h-screen">
         <div className="p-8">
            <div className="flex items-center gap-3 mb-10">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/50">
+              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-900/50 transform rotate-3">
                 <ShieldCheck className="text-white h-7 w-7" />
               </div>
               <div>
-                <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">Shop Finder</h1>
-                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-1">Platform Admin</p>
+                <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">Openshop</h1>
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-1">Platform Control</p>
               </div>
            </div>
 
@@ -100,14 +100,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
                active={activeTab === 'metrics'} 
                onClick={() => setActiveTab('metrics')} 
                icon={BarChart3} 
-               label="Metrics" 
+               label="Market Analysis" 
              />
            </nav>
         </div>
 
         <div className="mt-auto p-8 border-t border-gray-800">
            <div className="flex items-center gap-3 mb-6 p-4 bg-gray-800/50 rounded-2xl">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
                 <UserCheck className="h-4 w-4" />
               </div>
               <div className="overflow-hidden">
@@ -135,15 +135,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
                 {activeTab === 'metrics' && 'Market Analysis'}
               </h2>
             </div>
-            <div className="hidden lg:flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest border border-blue-100">
+            <div className="hidden lg:flex items-center gap-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-full font-black text-xs uppercase tracking-widest border border-indigo-100">
               <Clock className="h-4 w-4" /> Live Tracking
             </div>
           </div>
         </header>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <StatCard label="Total Users" value={stats.totalUsers} icon={Users} color="blue" trend="+12% month" />
-          <StatCard label="Live Shops" value={stats.totalShops} icon={Store} color="indigo" trend="Global units" />
+          <StatCard label="Total Users" value={stats.totalUsers} icon={Users} color="indigo" trend="+12% month" />
+          <StatCard label="Live Units" value={stats.totalShops} icon={Store} color="indigo" trend="Global units" />
           <StatCard label="Open Now" value={stats.openShops} icon={TrendingUp} color="green" trend="Active status" />
           <StatCard label="Log Events" value={stats.totalEvents} icon={Activity} color="orange" trend="Total updates" />
         </section>
@@ -152,15 +152,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
           <section className="bg-white rounded-[40px] shadow-sm border overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="p-8 border-b bg-gray-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3">
-                <Users className="text-blue-600 h-6 w-6" />
+                <Users className="text-indigo-600 h-6 w-6" />
                 <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Users</h3>
               </div>
               <div className="relative w-full sm:w-80 group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
                 <input 
                   type="text" 
                   placeholder="Search accounts..." 
-                  className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl font-bold text-sm focus:border-blue-600 outline-none shadow-inner"
+                  className="w-full pl-12 pr-4 py-4 bg-white border-2 border-gray-100 rounded-2xl font-bold text-sm focus:border-indigo-600 outline-none shadow-inner"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
@@ -182,10 +182,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
                   {filteredUsers.map(u => {
                     const shop = state.shops.find(s => s.id === u.shopId);
                     return (
-                      <tr key={u.id} className="hover:bg-blue-50/30 transition-all group">
+                      <tr key={u.id} className="hover:bg-indigo-50/30 transition-all group">
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center text-blue-700 font-black text-lg shadow-sm">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-indigo-700 font-black text-lg shadow-sm">
                               {u.username.charAt(0)}
                             </div>
                             <div>
@@ -201,7 +201,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
                            </div>
                         </td>
                         <td className="px-8 py-6">
-                           <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm ${u.isAdmin ? 'bg-purple-600 text-white' : (u.shopId ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600')}`}>
+                           <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm ${u.isAdmin ? 'bg-purple-600 text-white' : (u.shopId ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600')}`}>
                              {u.isAdmin ? 'Admin' : (u.shopId ? 'Owner' : 'User')}
                            </span>
                         </td>
@@ -214,7 +214,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
                            ) : <p className="text-xs text-gray-300 font-bold uppercase">None</p>}
                         </td>
                         <td className="px-8 py-6 text-right">
-                           <button className="p-3 hover:bg-blue-600 hover:text-white rounded-xl text-blue-600 transition-all border border-blue-100">
+                           <button className="p-3 hover:bg-indigo-600 hover:text-white rounded-xl text-indigo-600 transition-all border border-indigo-100">
                              <ArrowUpRight className="h-4 w-4" />
                            </button>
                         </td>
@@ -231,14 +231,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
           <section className="bg-white rounded-[40px] shadow-sm border overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="p-8 border-b bg-gray-50/50 flex justify-between items-center">
               <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">System Feed</h3>
-              <Activity className="h-6 w-6 text-blue-600" />
+              <Activity className="h-6 w-6 text-indigo-600" />
             </div>
             <div className="p-8 space-y-4">
               {recentActivity.length > 0 ? recentActivity.map((event) => {
                 const shop = state.shops.find(s => s.id === event.shopId);
-                const isAuto = event.username.includes('Auto');
                 return (
-                  <div key={event.id} className="flex items-center gap-6 p-6 rounded-3xl border-2 border-gray-50 bg-gray-50/30 hover:bg-white hover:shadow-xl hover:border-blue-100 transition-all group">
+                  <div key={event.id} className="flex items-center gap-6 p-6 rounded-3xl border-2 border-gray-50 bg-gray-50/30 hover:bg-white hover:shadow-xl hover:border-indigo-100 transition-all group">
                      <div className={`p-4 rounded-2xl shadow-sm transition-transform group-hover:scale-110 ${event.action.includes('Opened') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {event.action.includes('Opened') ? <CheckCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
                      </div>
@@ -246,7 +245,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-black text-gray-900 text-lg uppercase tracking-tight leading-tight">{event.action}</p>
-                            <p className="text-sm font-bold text-blue-600 flex items-center gap-1 mt-0.5"><Store className="h-3 w-3" /> {shop?.name || 'Deleted Facility'}</p>
+                            <p className="text-sm font-bold text-indigo-600 flex items-center gap-1 mt-0.5"><Store className="h-3 w-3" /> {shop?.name || 'Deleted Facility'}</p>
                           </div>
                           <span className="text-[10px] font-black text-gray-400 bg-white px-3 py-1 rounded-full border border-gray-100 shadow-sm uppercase tracking-widest">{new Date(event.timestamp).toLocaleTimeString()}</span>
                         </div>
@@ -256,7 +255,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
               }) : (
                 <div className="p-24 text-center">
                   <Activity className="h-16 w-16 text-gray-200 mx-auto mb-4" />
-                  <p className="text-xl font-black text-gray-400 uppercase">No events</p>
+                  <p className="text-xl font-black text-gray-400 uppercase tracking-widest">No activity detected</p>
                 </div>
               )}
             </div>
@@ -322,7 +321,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ state, onLogout }) => {
 const SidebarLink: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string }> = ({ active, onClick, icon: Icon, label }) => (
   <button 
     onClick={onClick}
-    className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-sm transition-all border-2 border-transparent ${active ? 'bg-blue-600 text-white shadow-lg border-blue-500' : 'text-gray-500 hover:bg-gray-800/50 hover:text-white'}`}
+    className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-sm transition-all border-2 border-transparent ${active ? 'bg-indigo-600 text-white shadow-lg border-indigo-500' : 'text-gray-500 hover:bg-gray-800/50 hover:text-white'}`}
   >
     <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-gray-500'}`} /> {label}
   </button>
