@@ -1,225 +1,68 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, CheckCircle, Package, ArrowLeft, Navigation, MapPin, X, Loader2 } from 'lucide-react';
-import Layout from '../components/Layout';
-import { AppState, Shop } from '../types';
-import ShopDetailModal from '../components/ShopDetailModal';
-import { BUSINESS_CATEGORIES } from '../constants';
+import { Search, CheckCircle, Package, Store, ArrowLeft, Navigation, MapPin, X } from 'lucide-react';
+import Layout from './Layout';
+import { AppState, Shop } from './types';
+import ShopDetailModal from './ShopDetailModal';
+import { BUSINESS_CATEGORIES } from './constants';
 
 interface AvailablePageProps {
   state: AppState;
   onLogout: () => void;
   onToggleFavorite: (id: string) => void;
+  onAddComment: (shopId: string, text: string) => void;
 }
 
-const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-};
-
-const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggleFavorite }) => {
+const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggleFavorite, onAddComment }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [locStatus, setLocStatus] = useState<'idle' | 'fixing' | 'ready' | 'error'>('idle');
   const navigate = useNavigate();
   const { currentUser, shops } = state;
-  const userShop = shops.find(s => s.id === currentUser?.shopId);
-
-  // Auto-capture location
-  useEffect(() => {
-    handleCaptureLocation();
-  }, []);
-
-  const handleCaptureLocation = () => {
-    if (isCapturing) return;
-    setIsCapturing(true);
-    setLocStatus('fixing');
-
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setIsCapturing(false);
-          setLocStatus('ready');
-        },
-        () => {
-          setIsCapturing(false);
-          setLocStatus('error');
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    } else {
-      setIsCapturing(false);
-      setLocStatus('error');
-    }
-  };
 
   const discoverList = useMemo(() => {
-    let list: { shop: Shop; item: any; distance: number | null }[] = [];
     const term = searchTerm.toLowerCase();
-
-    shops.forEach(s => {
-      if (!s.isOpen) return;
-      if (selectedCategory && s.type !== selectedCategory) return;
-
-      (s.items || []).forEach(item => {
-        if (item.available && (item.name.toLowerCase().includes(term) || s.name.toLowerCase().includes(term))) {
-          let dist = null;
-          if (userLocation && s.location && s.locationVisible) {
-            dist = getDistance(userLocation.lat, userLocation.lng, s.location.lat, s.location.lng);
-          }
-          list.push({ shop: s, item, distance: dist });
-        }
-      });
-    });
-
-    if (userLocation) {
-      list.sort((a, b) => {
-        const dA = a.distance ?? 999999;
-        const dB = b.distance ?? 999999;
-        return dA - dB;
-      });
-    }
-
-    return list;
-  }, [shops, searchTerm, userLocation, selectedCategory]);
+    return shops.filter(s => s.isOpen && (
+        s.name.toLowerCase().includes(term) || 
+        s.type.toLowerCase().includes(term) ||
+        s.items.some(i => i.available && i.name.toLowerCase().includes(term))
+    ));
+  }, [shops, searchTerm]);
 
   return (
-    <Layout user={currentUser!} shop={userShop} onLogout={onLogout}>
-      <div className="mb-8">
-        <button 
-          onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 text-indigo-700 font-black mb-4 hover:gap-3 transition-all"
-        >
-          <ArrowLeft className="h-5 w-5" /> Dashboard
-        </button>
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight uppercase leading-none">Discover</h1>
-            <p className="text-gray-500 font-bold mt-2 italic text-sm">Real-time availability near you</p>
-          </div>
-          <div className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black transition-all border ${locStatus === 'ready' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
-             {locStatus === 'fixing' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-             {locStatus === 'ready' ? 'Proximity Filter Active' : (locStatus === 'fixing' ? 'Syncing GPS...' : 'GPS Offline')}
-          </div>
-        </div>
+    <Layout user={currentUser!} onLogout={onLogout}>
+      <div className="mb-8 animate-in fade-in slide-in-from-left-4 duration-500">
+        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-700 font-black mb-4 hover:gap-3 transition-all"><ArrowLeft className="h-5 w-5" /> Dashboard</button>
+        <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Discover</h1>
+        <p className="text-gray-500 font-bold">Find facilities open right now on Shop Finder.</p>
       </div>
-
-      <div className="space-y-6 mb-10">
-        <div className="relative max-w-xl">
-          <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input 
-            type="text"
-            className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent rounded-2xl shadow-sm focus:border-indigo-700 outline-none font-bold text-lg"
-            placeholder="What are you looking for?"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Categories</h3>
-            {selectedCategory && (
-              <button 
-                onClick={() => setSelectedCategory(null)}
-                className="text-[10px] font-black text-red-500 uppercase flex items-center gap-1 hover:text-red-700 transition-colors"
-              >
-                Reset <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 md:-mx-0 md:px-0">
-            {BUSINESS_CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
-                className={`
-                  px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-2
-                  ${selectedCategory === cat 
-                    ? 'bg-indigo-700 text-white border-indigo-700 shadow-lg shadow-indigo-100' 
-                    : 'bg-white text-gray-500 border-gray-100 hover:border-indigo-200'}
-                `}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="relative mb-10 max-w-xl group">
+        <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+        <input type="text" className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent rounded-2xl shadow-lg shadow-blue-50 focus:border-blue-700 outline-none font-bold transition-all" placeholder="Search open facilities..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
-
-      {discoverList.length > 0 ? (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-          {discoverList.map((res, idx) => (
-            <div 
-              key={idx}
-              onClick={() => setSelectedShop(res.shop)}
-              className="group bg-white p-3 md:p-6 rounded-[24px] md:rounded-3xl shadow-sm border-2 border-transparent hover:border-indigo-100 hover:shadow-xl transition-all flex flex-col cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300"
-            >
-              <div className="flex items-start gap-2 md:gap-4 mb-3 md:mb-4">
-                <div className="p-2 md:p-3 bg-green-50 text-green-600 rounded-xl md:rounded-2xl shrink-0">
-                  <CheckCircle className="h-4 w-4 md:h-6 md:w-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col gap-0.5">
-                    <h4 className="font-black text-gray-900 text-xs md:text-lg leading-tight uppercase tracking-tight truncate">{res.item.name}</h4>
-                    <div className="flex items-center flex-wrap gap-1">
-                      {res.distance !== null && (
-                        <span className="text-[7px] md:text-[8px] w-fit font-black bg-indigo-700 text-white px-1.5 md:py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1">
-                          <MapPin className="h-2 w-2" /> {res.distance.toFixed(1)} KM
-                        </span>
-                      )}
-                      <span className="text-[7px] md:text-[8px] font-black text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
-                        {res.shop.type}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-[8px] md:text-[10px] font-black text-indigo-700 uppercase tracking-widest mt-1 italic truncate">{res.shop.name}</p>
-                </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {discoverList.map(shop => (
+          <div key={shop.id} onClick={() => setSelectedShop(shop)} className="bg-white p-6 rounded-3xl shadow-sm border-2 border-transparent hover:border-blue-100 hover:shadow-xl transition-all cursor-pointer group">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <Store className="h-6 w-6" />
               </div>
-              <div className="mt-auto pt-2 md:pt-4 border-t border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
-                <div className="flex items-center gap-1 text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest truncate max-w-full">
-                  <MapPin className="h-2 w-2 md:h-3 md:w-3 shrink-0" /> {res.shop.lga}
-                </div>
-                <div className="text-[7px] md:text-[10px] font-black text-green-600 uppercase tracking-widest">
-                  {res.item.time || 'IN STOCK'}
-                </div>
-              </div>
+              <div className="px-3 py-1 bg-green-50 text-green-700 text-[10px] font-black uppercase rounded-full tracking-widest">Active Now</div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white p-10 md:p-20 rounded-[40px] text-center border-2 border-dashed border-gray-100 animate-in zoom-in-95 duration-500">
-           <Package className="h-10 w-10 md:h-16 md:w-16 text-gray-200 mx-auto mb-4" />
-           <p className="text-sm md:text-xl font-black text-gray-400 uppercase tracking-widest">No results</p>
-           <p className="text-gray-400 font-bold mt-2 text-xs md:text-sm">Try searching for other products or categories.</p>
-        </div>
-      )}
-
-      {selectedShop && (
-        <ShopDetailModal 
-          shop={selectedShop} 
-          isFavorite={currentUser?.favorites.includes(selectedShop.id) || false}
-          onClose={() => setSelectedShop(null)} 
-          onToggleFavorite={onToggleFavorite}
-          comments={state.comments}
-        />
-      )}
+            <h4 className="font-black text-gray-900 text-lg uppercase mb-1 truncate">{shop.name}</h4>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">{shop.type}</p>
+            <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase"><MapPin className="h-3 w-3 text-blue-600" /> {shop.lga}, {shop.state}</div>
+          </div>
+        ))}
+        {discoverList.length === 0 && (
+          <div className="col-span-full py-20 text-center bg-white rounded-[40px] border-2 border-dashed border-gray-100">
+            <Search className="h-12 w-12 text-gray-200 mx-auto mb-4" />
+            <p className="font-black text-gray-400 uppercase tracking-widest">No matching open facilities</p>
+          </div>
+        )}
+      </div>
+      {selectedShop && <ShopDetailModal shop={selectedShop} isFavorite={currentUser?.favorites.includes(selectedShop.id) || false} onClose={() => setSelectedShop(null)} onToggleFavorite={onToggleFavorite} comments={state.comments} onAddComment={onAddComment} />}
     </Layout>
   );
 };
-
 export default AvailablePage;
