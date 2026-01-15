@@ -3,3 +3,4 @@ schemaVersion: "v1"
 runConfig:
   cpu: 1
   memoryMiB: 512
+  runCommand: "npm run start"
