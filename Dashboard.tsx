@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Store, Package, CheckCircle, Heart, History, ChevronRight, Clock, Navigation, Check, Plus, X } from 'lucide-react';
@@ -49,7 +48,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
   return (
     <Layout user={currentUser!} shop={userShop} allShops={shops} onLogout={onLogout} onUpdateShop={onUpdateShop} onAddComment={onAddComment}>
       <header className="mb-8 text-center animate-in fade-in slide-in-from-top-4 duration-700">
-        {/* Welcome Message */}
         <div className="bg-blue-50 py-4 px-6 rounded-3xl mb-6 inline-block border border-blue-100 shadow-sm">
            <h2 className="text-lg font-bold text-blue-800 uppercase tracking-tight">Hello, {currentUser?.username}! 👋</h2>
            <p className="text-xs font-medium text-blue-600">Welcome back to Shop Finder. We are happy to have you back!</p>

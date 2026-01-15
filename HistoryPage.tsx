@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { History, Clock, ArrowLeft, Trash2 } from 'lucide-react';
@@ -16,7 +15,6 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ state, onLogout, onClearHisto
   const { currentUser, shops, history } = state;
   const userShop = shops.find(s => s.id === currentUser?.shopId);
   
-  // For standard users, show history for their shop. For admins or shoppers, show broader (not implemented fully yet, focusing on facility history)
   const filteredHistory = history.filter(h => h.shopId === userShop?.id).sort((a, b) => b.timestamp - a.timestamp);
 
   return (

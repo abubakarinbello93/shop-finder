@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, User as UserIcon, Phone, Mail, Lock, Store, MapPin, Navigation, Package, X, Check, Eye, EyeOff } from 'lucide-react';

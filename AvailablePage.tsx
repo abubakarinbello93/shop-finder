@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, CheckCircle, Package, Store, ArrowLeft, Navigation, MapPin, X } from 'lucide-react';

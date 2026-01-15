@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-// Added Store to the imports
 import { Plus, Edit2, Trash2, X, Save, Check, Package, Clock, ArrowLeft, Search, Lock, Store } from 'lucide-react';
 import Layout from './Layout';
 import { AppState, Shop, ServiceItem } from './types';
@@ -124,12 +123,6 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
             </div>
           </div>
         ))}
-        {filteredItems.length === 0 && !isAdding && (
-            <div className="py-20 text-center bg-white rounded-[32px] border border-slate-100">
-                <Package className="h-10 w-10 text-slate-200 mx-auto mb-4" />
-                <p className="font-black text-slate-400 uppercase tracking-widest">No items found in catalog</p>
-            </div>
-        )}
       </div>
     </Layout>
   );

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Lock, Users, Save, X, Plus, Trash2, Calendar, UserPlus, ChevronRight, Check, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import Layout from './components/Layout';
+import Layout from './Layout';
 import { AppState, Shop, BusinessHour, BusinessDay, Staff } from './types';
 import { DAYS } from './constants';
 
@@ -18,30 +18,92 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
   const { currentUser, shops } = state;
   const userShop = (shops || []).find(s => s.id === currentUser?.shopId);
   const navigate = useNavigate();
+
   const [newStaff, setNewStaff] = useState({ username: '', password: '', canAddItems: true });
   const [tempHours, setTempHours] = useState<BusinessHour[]>(userShop?.businessHours || []);
   const [isAuto, setIsAuto] = useState(userShop?.isAutomatic || false);
   const [dayToAdd, setDayToAdd] = useState<BusinessDay | ''>('');
+
   const [pwdForm, setPwdForm] = useState({ current: '', new: '', confirm: '', show: false });
+
   const isOwner = userShop && userShop.ownerId === currentUser?.id;
-  const availableDays = useMemo(() => (DAYS as BusinessDay[]).filter(d => !tempHours.some(h => h.day === d)), [tempHours]);
+
+  const availableDays = useMemo(() => {
+    return (DAYS as BusinessDay[]).filter(d => !tempHours.some(h => h.day === d));
+  }, [tempHours]);
+
   const validateOverlaps = (hours: BusinessHour[]): string | null => {
     for (const day of DAYS as BusinessDay[]) {
       const daySlots = hours.filter(h => h.day === day && h.enabled);
       if (daySlots.length < 2) continue;
       const sorted = [...daySlots].sort((a, b) => a.open.localeCompare(b.open));
-      for (let i = 0; i < sorted.length - 1; i++) { if (sorted[i].close > sorted[i + 1].open) return `Overlap on ${day}!`; }
+      for (let i = 0; i < sorted.length - 1; i++) {
+        if (sorted[i].close > sorted[i + 1].open) {
+          return `Overlap on ${day}!`;
+        }
+      }
     }
     return null;
   };
-  const handleUpdateHours = (id: string, updates: Partial<BusinessHour>) => { setTempHours(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h)); setError(null); };
-  const handleAddDay = () => { if (!dayToAdd) return; setTempHours([...tempHours, { id: Math.random().toString(36).substr(2, 9), day: dayToAdd as BusinessDay, open: '09:00', close: '17:00', enabled: true }]); setDayToAdd(''); };
-  const handleSaveHours = () => { if (!userShop) return; const overlapErr = validateOverlaps(tempHours); if (overlapErr) { setError(overlapErr); return; } onUpdateShop(userShop.id, { businessHours: tempHours, isAutomatic: isAuto }); setActiveModal(null); };
-  const handleUpdateStaff = (id: string, updates: Partial<Staff>) => { if (!userShop) return; onUpdateShop(userShop.id, { staff: userShop.staff.map(s => s.id === id ? { ...s, ...updates } : s) }); };
-  const handleAddStaff = () => { if (!newStaff.username || !newStaff.password || !userShop) return; onUpdateShop(userShop.id, { staff: [...(userShop.staff || []), { id: Math.random().toString(36).substr(2, 9), username: newStaff.username, password: newStaff.password, canAddItems: newStaff.canAddItems }] }); setNewStaff({ username: '', password: '', canAddItems: true }); setActiveModal('staff'); };
-  const handlePasswordChange = () => { if (pwdForm.new !== pwdForm.confirm) { setError("New passwords do not match."); return; } if (pwdForm.current !== currentUser?.password) { setError("Incorrect current password."); return; } onUpdatePassword(pwdForm.new); alert("Password updated!"); setActiveModal(null); };
-  const menuItems = [{ title: 'Change Password', desc: 'Update security', icon: Lock, action: () => { setError(null); setActiveModal('password'); } }];
-  if (userShop) { menuItems.unshift({ title: 'Business Hour', desc: 'Opening/Closing', icon: Clock, action: () => { setTempHours(userShop.businessHours || []); setIsAuto(userShop.isAutomatic); setActiveModal('hours'); } }); if (isOwner) menuItems.push({ title: 'Staff Management', desc: 'Permissions', icon: Users, action: () => setActiveModal('staff') }); }
+
+  const handleUpdateHours = (id: string, updates: Partial<BusinessHour>) => {
+    setTempHours(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+    setError(null);
+  };
+
+  const handleAddDay = () => {
+    if (!dayToAdd) return;
+    setTempHours([...tempHours, { 
+      id: Math.random().toString(36).substr(2, 9), 
+      day: dayToAdd as BusinessDay, 
+      open: '09:00', 
+      close: '17:00', 
+      enabled: true 
+    }]);
+    setDayToAdd('');
+  };
+
+  const handleSaveHours = () => {
+    if (!userShop) return;
+    const overlapErr = validateOverlaps(tempHours);
+    if (overlapErr) { setError(overlapErr); return; }
+    onUpdateShop(userShop.id, { businessHours: tempHours, isAutomatic: isAuto });
+    setActiveModal(null);
+  };
+
+  const handleUpdateStaff = (id: string, updates: Partial<Staff>) => {
+    if (!userShop) return;
+    onUpdateShop(userShop.id, { staff: userShop.staff.map(s => s.id === id ? { ...s, ...updates } : s) });
+  };
+
+  const handleAddStaff = () => {
+    if (!newStaff.username || !newStaff.password || !userShop) return;
+    onUpdateShop(userShop.id, { staff: [...(userShop.staff || []), { 
+      id: Math.random().toString(36).substr(2, 9), 
+      username: newStaff.username, 
+      password: newStaff.password, 
+      canAddItems: newStaff.canAddItems 
+    }] });
+    setNewStaff({ username: '', password: '', canAddItems: true });
+    setActiveModal('staff');
+  };
+
+  const handlePasswordChange = () => {
+    if (pwdForm.new !== pwdForm.confirm) { setError("New passwords do not match."); return; }
+    if (pwdForm.current !== currentUser?.password) { setError("Incorrect current password."); return; }
+    if (pwdForm.new.length < 4) { setError("Password too short."); return; }
+    onUpdatePassword(pwdForm.new);
+    alert("Password updated!");
+    setActiveModal(null);
+  };
+
+  const menuItems = [
+    { title: 'Change Password', desc: 'Update security', icon: Lock, action: () => { setError(null); setActiveModal('password'); } }
+  ];
+  if (userShop) {
+    menuItems.unshift({ title: 'Business Hour', desc: 'Opening/Closing', icon: Clock, action: () => { setTempHours(userShop.businessHours || []); setIsAuto(userShop.isAutomatic); setActiveModal('hours'); } });
+    if (isOwner) menuItems.push({ title: 'Staff Management', desc: 'Permissions', icon: Users, action: () => setActiveModal('staff') });
+  }
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout}>
@@ -60,6 +122,25 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       {activeModal === 'staff' && userShop && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"><div className="p-6 border-b bg-gray-50 flex justify-between items-center"><h2 className="text-2xl font-black text-gray-900 tracking-tighter">Staff Management</h2><button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full"><X className="h-5 w-5" /></button></div><div className="p-6 overflow-y-auto"><button onClick={() => setActiveModal('addStaff')} className="w-full mb-6 p-4 bg-blue-50 border-2 border-dashed border-blue-200 rounded-xl text-blue-600 font-black text-lg flex items-center justify-center gap-2"><Plus className="h-5 w-5" /> Add Staff</button><div className="space-y-3">{(userShop.staff || []).map(member => <div key={member.id} className="flex items-center justify-between p-4 bg-white border rounded-xl"><div className="flex-1"><span className="font-bold text-base text-gray-800 block">{member.username}</span><span className="text-[10px] font-bold text-gray-400 uppercase">PWD: {member.password}</span></div><div className="flex items-center gap-3"><div className="flex flex-col items-center"><label className="text-[8px] font-black uppercase mb-1">Items</label><button onClick={() => handleUpdateStaff(member.id, { canAddItems: !member.canAddItems })} className={`w-8 h-5 rounded-full transition-colors flex items-center px-1 ${member.canAddItems ? 'bg-green-500 justify-end' : 'bg-gray-300 justify-start'}`}><div className="w-3 h-3 bg-white rounded-full" /></button></div><button onClick={() => onUpdateShop(userShop.id, { staff: userShop.staff.filter(s => s.id !== member.id) })} className="p-2 text-red-400"><Trash2 className="h-4 w-4" /></button></div></div>)}</div></div></div>
+        </div>
+      )}
+      {activeModal === 'addStaff' && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 md:p-8">
+            <h2 className="text-2xl font-black text-gray-900 mb-6">Add New Staff</h2>
+            <div className="space-y-4">
+              <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Username" value={newStaff.username} onChange={e => setNewStaff({ ...newStaff, username: e.target.value })} />
+              <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Password" value={newStaff.password} onChange={e => setNewStaff({ ...newStaff, password: e.target.value })} />
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                 <input type="checkbox" className="w-4 h-4" checked={newStaff.canAddItems} onChange={e => setNewStaff({ ...newStaff, canAddItems: e.target.checked })} />
+                 <span className="font-bold text-sm text-gray-700">Allow Adding Items</span>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setActiveModal('staff')} className="flex-1 py-3 font-black text-gray-500 text-sm">Cancel</button>
+                <button onClick={handleAddStaff} className="flex-[2] py-3 bg-blue-600 text-white font-black rounded-xl shadow-lg text-sm">Save</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </Layout>

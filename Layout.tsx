@@ -1,4 +1,3 @@
-
 import React, { ReactNode, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
@@ -13,7 +12,11 @@ import {
   X,
   MessageSquarePlus,
   Send,
-  Bell
+  Bell,
+  Navigation,
+  Check,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { User, Shop } from './types';
 
@@ -27,17 +30,49 @@ interface LayoutProps {
   onAddComment?: (shopId: string, text: string) => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, user, shop, onLogout, onAddComment }) => {
+const Layout: React.FC<LayoutProps> = ({ children, user, shop, onLogout, onUpdateShop, onAddComment }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [commentText, setCommentText] = useState('');
   const location = useLocation();
+
+  const handleCaptureShopLocation = () => {
+    if (!shop || !onUpdateShop) return;
+    setIsCapturing(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          onUpdateShop(shop.id, { 
+            location: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+            locationVisible: true
+          });
+          setIsCapturing(false);
+          alert(`Facility GPS fixed! Customers can now find you.`);
+        },
+        () => {
+          setIsCapturing(false);
+          alert("Failed to capture location. Please check browser permissions.");
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      setIsCapturing(false);
+      alert("Geolocation is not supported by your browser.");
+    }
+  };
+
+  const toggleVisibility = () => {
+    if (!shop || !onUpdateShop) return;
+    onUpdateShop(shop.id, { locationVisible: !shop.locationVisible });
+  };
 
   const handlePostComment = () => {
     if (commentText.trim() && shop && onAddComment) {
       onAddComment(shop.id, commentText.trim());
       setCommentText('');
       setShowCommentModal(false);
+      alert("Status update posted!");
     }
   };
 
@@ -47,7 +82,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, onLogout, onAddCo
       { name: 'Discover', icon: CheckCircle, path: '/available' },
       { name: 'Favorites', icon: Heart, path: '/favorites' },
     ];
-    if (user.shopId) items.splice(1, 0, { name: 'Inventory', icon: Package, path: '/services' });
+    if (user.shopId) {
+      items.splice(1, 0, { name: 'Inventory', icon: Package, path: '/services' });
+      items.push({ name: 'Settings', icon: Settings, path: '/settings' });
+    }
     items.push({ name: 'History', icon: History, path: '/history' });
     return items;
   }, [user.shopId]);
@@ -77,10 +115,31 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, onLogout, onAddCo
               </Link>
             ))}
             {shop && (
-              <div className="mt-8 pt-6 border-t border-slate-100">
+              <div className="mt-8 pt-6 border-t border-slate-100 space-y-4">
                 <button onClick={() => setShowCommentModal(true)} className="w-full flex items-center px-4 py-3 text-sm font-black text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
                   <MessageSquarePlus className="mr-3 h-5 w-5" /> Post Update
                 </button>
+                <button
+                  onClick={handleCaptureShopLocation}
+                  disabled={isCapturing}
+                  className={`flex items-center w-full px-4 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${shop.location ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-700 animate-pulse'}`}
+                >
+                  {isCapturing ? (
+                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-2" />
+                  ) : (
+                    shop.location ? <Check className="mr-2 h-4 w-4" /> : <Navigation className="mr-2 h-4 w-4" />
+                  )}
+                  {isCapturing ? 'Locating...' : (shop.location ? 'Update GPS' : 'Fix Shop GPS')}
+                </button>
+                <div onClick={toggleVisibility} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-all">
+                   <div className="flex items-center gap-2">
+                      {shop.locationVisible ? <Eye className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-slate-400" />}
+                      <span className="text-[9px] font-black uppercase text-slate-600">Discoverable</span>
+                   </div>
+                   <div className={`w-8 h-4 rounded-full transition-all relative ${shop.locationVisible ? 'bg-green-500' : 'bg-slate-300'}`}>
+                      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${shop.locationVisible ? 'right-0.5' : 'left-0.5'}`} />
+                   </div>
+                </div>
               </div>
             )}
           </nav>

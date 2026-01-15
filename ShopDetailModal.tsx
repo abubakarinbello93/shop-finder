@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { X, Phone, Mail, MapPin, Clock, CheckCircle, Package, Info, Heart, Search, Bell } from 'lucide-react';
 import { Shop, Comment } from './types';

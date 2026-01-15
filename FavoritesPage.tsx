@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Store, ChevronRight, ArrowLeft, Search } from 'lucide-react';
@@ -88,13 +87,6 @@ const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggle
             </div>
           </div>
         ))}
-
-        {favoriteShops.length === 0 && (
-          <div className="col-span-full py-24 text-center bg-white rounded-[40px] border-2 border-dashed border-gray-100">
-            <Heart className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-            <p className="font-black text-gray-400 uppercase tracking-widest">No favorites found</p>
-          </div>
-        )}
       </div>
 
       {selectedShop && (
