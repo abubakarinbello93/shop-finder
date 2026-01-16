@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, User as UserIcon, Phone, Mail, Lock, Store, MapPin, Navigation, Package, X, Check, Eye, EyeOff } from 'lucide-react';
@@ -69,7 +70,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
     if (registerShop) {
       const finalCategory = formData.shopType === 'Other' ? formData.otherCategory : formData.shopType;
       if (!formData.shopName || !finalCategory || !formData.state || !formData.lga || !formData.address) {
-        alert("All Shop Finder facility fields are mandatory.");
+        alert("All shop fields are mandatory.");
         return;
       }
       shop = {
@@ -104,7 +105,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
         <div className="p-6 border-b bg-gray-50/50 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-black text-gray-900 tracking-tight uppercase">Join Shop Finder</h1>
-            <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">Step {step} of {registerShop ? 2 : 1}</p>
+            <p className="text-gray-500 font-bold text-xs">Step {step} of {registerShop ? 2 : 1}</p>
           </div>
           <Link to="/login" className="p-2 bg-white rounded-full border shadow-sm hover:shadow-md transition-shadow">
             <X className="h-5 w-5 text-gray-400" />
@@ -116,7 +117,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Username *" icon={UserIcon} value={formData.username} onChange={v => setFormData({ ...formData, username: v })} />
-                <Input label="Phone Number *" icon={Phone} value={formData.phone} onChange={v => setFormData({ ...formData, phone: v })} />
+                <Input label="phone number *" icon={Phone} value={formData.phone} onChange={v => setFormData({ ...formData, phone: v })} />
               </div>
               <Input label="Email (Optional)" icon={Mail} value={formData.email} onChange={v => setFormData({ ...formData, email: v })} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -145,10 +146,10 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
                 />
               </div>
               <div className="bg-blue-50 p-6 rounded-2xl border-2 border-dashed border-blue-200 text-center">
-                <p className="font-black text-blue-900 mb-4 text-base">Registering a Facility/Shop?</p>
+                <p className="font-black text-blue-900 mb-4 text-base">Are you a Shop Owner?</p>
                 <div className="flex gap-4">
-                  <button onClick={() => setRegisterShop(true)} className={`flex-1 py-3 px-4 rounded-xl font-black transition-all ${registerShop ? 'bg-blue-700 text-white shadow-lg shadow-blue-100' : 'bg-white text-gray-500 border-2'}`}>YES</button>
-                  <button onClick={() => setRegisterShop(false)} className={`flex-1 py-3 px-4 rounded-xl font-black transition-all ${!registerShop ? 'bg-blue-700 text-white shadow-lg shadow-blue-100' : 'bg-white text-gray-500 border-2'}`}>NO</button>
+                  <button onClick={() => setRegisterShop(true)} className={`flex-1 py-3 px-4 rounded-xl font-black transition-all ${registerShop ? 'bg-blue-700 text-white shadow-lg' : 'bg-white text-gray-500 border-2'}`}>YES</button>
+                  <button onClick={() => setRegisterShop(false)} className={`flex-1 py-3 px-4 rounded-xl font-black transition-all ${!registerShop ? 'bg-blue-700 text-white shadow-lg' : 'bg-white text-gray-500 border-2'}`}>NO</button>
                 </div>
               </div>
             </div>
@@ -156,12 +157,12 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
 
           {step === 2 && (
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-              <Input label="Facility Name *" icon={Store} value={formData.shopName} onChange={v => setFormData({ ...formData, shopName: v })} />
+              <Input label="Facility/Shop Name *" icon={Store} value={formData.shopName} onChange={v => setFormData({ ...formData, shopName: v })} />
               
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Category *</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase pl-1">Category *</label>
                 <select 
-                  className="w-full p-3.5 bg-gray-50 border-2 border-transparent rounded-xl font-bold focus:border-blue-700 focus:bg-white outline-none transition-all" 
+                  className="w-full p-3.5 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-700 outline-none" 
                   value={formData.shopType} 
                   onChange={e => setFormData({ ...formData, shopType: e.target.value })}
                 >
@@ -178,38 +179,38 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">State *</label>
-                  <select className="w-full p-3.5 bg-gray-50 border-2 border-transparent rounded-xl font-bold focus:border-blue-700 focus:bg-white outline-none transition-all" value={formData.state} onChange={e => setFormData({ ...formData, state: e.target.value, lga: '' })}>
+                  <label className="text-[10px] font-black text-gray-400 uppercase pl-1">State *</label>
+                  <select className="w-full p-3.5 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-700 outline-none" value={formData.state} onChange={e => setFormData({ ...formData, state: e.target.value, lga: '' })}>
                     <option value="">Select State</option>
                     {ALL_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">LGA *</label>
-                  <select className="w-full p-3.5 bg-gray-50 border-2 border-transparent rounded-xl font-bold focus:border-blue-700 focus:bg-white outline-none transition-all disabled:opacity-50" disabled={!formData.state} value={formData.lga} onChange={e => setFormData({ ...formData, lga: e.target.value })}>
+                  <label className="text-[10px] font-black text-gray-400 uppercase pl-1">LGA *</label>
+                  <select className="w-full p-3.5 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-700 outline-none disabled:opacity-50" disabled={!formData.state} value={formData.lga} onChange={e => setFormData({ ...formData, lga: e.target.value })}>
                     <option value="">Select LGA</option>
                     {lgas.map(l => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </div>
               </div>
-              <Input label="Full Address *" icon={MapPin} value={formData.address} onChange={v => setFormData({ ...formData, address: v })} />
+              <Input label="Address *" icon={MapPin} value={formData.address} onChange={v => setFormData({ ...formData, address: v })} />
               
               <button 
                 onClick={handleCaptureLocation}
                 disabled={isCapturing}
                 type="button"
-                className={`w-full flex items-center justify-center gap-2 p-4 rounded-xl font-black transition-all ${formData.lat ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                className={`w-full flex items-center justify-center gap-2 p-4 rounded-xl font-black transition-all ${formData.lat ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
               >
                 {isCapturing ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" /> : (formData.lat ? <Check className="h-4 w-4" /> : <Navigation className="h-4 w-4" />)}
-                {isCapturing ? 'Locating...' : (formData.lat ? 'GPS Active' : 'Link Facility GPS')}
+                {isCapturing ? 'Locating...' : (formData.lat ? 'GPS Linked' : 'Link Shop GPS')}
               </button>
             </div>
           )}
 
           <div className="flex gap-4 mt-8">
-            {step > 1 && <button onClick={() => setStep(step - 1)} className="flex-1 p-4 border-2 border-gray-100 rounded-xl font-black text-gray-500 hover:bg-gray-50 transition-colors uppercase tracking-widest text-xs">Back</button>}
-            <button onClick={step === 2 || (step === 1 && !registerShop) ? handleSubmit : handleNext} className="flex-[2] p-4 bg-blue-700 text-white rounded-xl font-black hover:bg-blue-800 flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-100 uppercase tracking-widest text-sm">
-              {step === 2 || (step === 1 && !registerShop) ? 'Finish Registration' : 'Continue'} <ArrowRight className="h-5 w-5" />
+            {step > 1 && <button onClick={() => setStep(step - 1)} className="flex-1 p-4 border-2 rounded-xl font-black text-gray-500 hover:bg-gray-50">Back</button>}
+            <button onClick={step === 2 || (step === 1 && !registerShop) ? handleSubmit : handleNext} className="flex-[2] p-4 bg-blue-700 text-white rounded-xl font-black hover:bg-blue-800 flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-100">
+              {step === 2 || (step === 1 && !registerShop) ? 'Finish Signup' : 'Continue'} <ArrowRight className="h-5 w-5" />
             </button>
           </div>
         </div>

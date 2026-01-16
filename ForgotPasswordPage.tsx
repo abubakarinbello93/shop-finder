@@ -13,6 +13,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  // Added const to resolve "Cannot find name 'navigate'" error
   const navigate = useNavigate();
 
   const handleNext = () => {
@@ -39,7 +40,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-700 via-blue-900 to-slate-900">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-700 via-indigo-900 to-black">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 animate-in fade-in zoom-in duration-500">
         <div className="mb-6">
            <Link to="/login" className="inline-flex items-center gap-2 text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-blue-700 transition-colors">
@@ -51,8 +52,8 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-xl mb-4 shadow-sm border border-blue-50">
             <span className="text-3xl font-black text-blue-700">S</span>
           </div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Security Center</h1>
-          <p className="text-gray-400 font-bold mt-1 text-[10px] tracking-widest uppercase italic">Shop Finder Access Recovery</p>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Forgot password</h1>
+          <p className="text-gray-400 font-bold mt-1 text-[10px] tracking-widest uppercase">Step {step} of 2</p>
         </div>
 
         {error && (
@@ -65,7 +66,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
           <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
             <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
                <p className="text-[11px] font-bold text-blue-800 leading-tight">
-                 Enter the identifier (username or phone) associated with your account.
+                 Enter your account identifier linked to your Shop Finder account.
                </p>
             </div>
             <div className="relative group">
@@ -77,7 +78,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
                 required
                 autoFocus
                 className="block w-full pl-11 pr-4 py-3.5 bg-gray-50 border-2 border-transparent rounded-xl focus:border-blue-700 focus:bg-white focus:outline-none transition-all font-bold text-gray-800 placeholder:text-gray-300"
-                placeholder="Account Identifier"
+                placeholder="Username or phone number"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
               />
@@ -86,16 +87,16 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
               onClick={handleNext}
               className="w-full bg-blue-700 text-white font-black py-4 rounded-xl hover:bg-blue-800 active:scale-[0.98] transition-all shadow-xl shadow-blue-100 flex items-center justify-center gap-2 group uppercase tracking-widest text-sm"
             >
-              Verify Account <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              Continue <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
         )}
 
         {step === 2 && (
           <form onSubmit={handleFinish} className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-               <p className="text-[11px] font-bold text-slate-700 leading-tight">
-                 Verified for: <span className="text-blue-600 font-black">{identifier}</span>. Set a new password below.
+            <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+               <p className="text-[11px] font-bold text-indigo-800 leading-tight">
+                 Identity verified for <span className="text-indigo-600 font-black">{identifier}</span>.
                </p>
             </div>
             <div className="relative group">
@@ -107,7 +108,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
                 required
                 autoFocus
                 className="block w-full pl-11 pr-12 py-3.5 bg-gray-50 border-2 border-transparent rounded-xl focus:border-blue-700 focus:bg-white focus:outline-none transition-all font-bold text-gray-800 placeholder:text-gray-300"
-                placeholder="Set New Password"
+                placeholder="New Password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
@@ -121,27 +122,27 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-800 text-white font-black py-4 rounded-xl hover:bg-blue-900 active:scale-[0.98] transition-all shadow-xl shadow-blue-200 flex items-center justify-center gap-2 group uppercase tracking-widest text-sm"
+              className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 group uppercase tracking-widest text-sm"
             >
-              Update Password <ShieldCheck className="h-5 w-5" />
+              Complete Reset <ShieldCheck className="h-5 w-5" />
             </button>
           </form>
         )}
 
         {step === 3 && (
           <div className="text-center py-4 animate-in zoom-in-95 duration-500">
-             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-100 border-2 border-white">
+             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-100">
                <CheckCircle className="h-8 w-8" />
              </div>
-             <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Access Restored</h2>
-             <p className="text-gray-500 font-bold mt-1 mb-6 leading-tight italic">
-               Your password has been reset. You can now access Shop Finder.
+             <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Success!</h2>
+             <p className="text-gray-500 font-bold mt-1 mb-6 leading-tight">
+               Your password has been updated. You can now log in to Shop Finder.
              </p>
              <button
               onClick={() => navigate('/login')}
               className="w-full bg-gray-900 text-white font-black py-4 rounded-xl hover:bg-black active:scale-[0.98] transition-all shadow-xl flex items-center justify-center gap-2 uppercase tracking-widest text-sm"
             >
-              Proceed to Login
+              Back to Login
             </button>
           </div>
         )}
