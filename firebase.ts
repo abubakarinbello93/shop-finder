@@ -1,16 +1,20 @@
 
 import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
-// Standard Firebase configuration object. 
-// For Firebase App Hosting, these values are typically provided in the project settings.
 const firebaseConfig = {
-  apiKey: "AIzaSy-PLACEHOLDER-KEY",
-  authDomain: "shopfinder-app.firebaseapp.com",
-  projectId: "shopfinder-app",
-  storageBucket: "shopfinder-app.firebasestorage.app",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyAXjMbSmR4d-u3XhpLsS9F7_aFjmMA8BTI",
+  authDomain: "shopfinder-shop.firebaseapp.com",
+  projectId: "shopfinder-shop",
+  storageBucket: "shopfinder-shop.firebasestorage.app",
+  messagingSenderId: "495176954158",
+  appId: "1:495176954158:web:fa45e57eda7513c71b0abf"
 };
 
 // Initialize Firebase
-export const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
+
+// Initialize Cloud Firestore and get a reference to the service
+export const db = getFirestore(app);
+
+
