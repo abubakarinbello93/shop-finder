@@ -1,7 +1,6 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { collection, addDoc, getDocs, updateDoc, doc, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment } from './types';
 import { MOCK_SHOPS } from './constants';
@@ -31,8 +30,6 @@ const App: React.FC = () => {
     history: [],
     comments: []
   });
-
-  const lastCheckRef = useRef<string>("");
 
   // Initial Data Load from Firestore
   useEffect(() => {
@@ -106,67 +103,71 @@ const App: React.FC = () => {
         return { success: false, message: "Sorry, that account identifier is already in use!" };
       }
 
-      // 1. Prepare User Object
-      const newUserObj: Omit<User, 'id'> = {
-        username: userData.username!,
-        password: userData.password!, 
-        phone: userData.phone!,
+      // 1. Prepare User Object (Explicitly clean undefined for Firestore)
+      const newUserObj = {
+        username: userData.username || '',
+        password: userData.password || '', 
+        phone: userData.phone || '',
         email: userData.email || '',
         favorites: [],
         isStaff: false,
-        isAdmin: false
+        isAdmin: false,
+        shopId: null as string | null
       };
 
-      // 2. If registering a shop, save shop first to get ID
-      let shopId = '';
+      let createdShopId = '';
+      let finalShopObj: any = null;
+
+      // 2. If registering a shop, save shop first
       if (shopData) {
-        const newShopObj: Omit<Shop, 'id'> = {
-          ownerId: 'temp', // Updated after user creation
+        const newShopRecord = {
+          ownerId: 'pending', // Temporary, will update after user is created
           code: generateShopCode(shopData.name || 'Shop'),
           name: shopData.name || 'My Facility',
           type: shopData.type || 'General',
           state: shopData.state || '',
           lga: shopData.lga || '',
           address: shopData.address || '',
-          contact: userData.phone!,
+          contact: userData.phone || '',
           isOpen: false,
           isAutomatic: false,
           locationVisible: true,
           businessHours: [],
           items: [],
           staff: [],
-          location: shopData.location || undefined
+          location: shopData.location || null
         };
         
-        const shopDocRef = await addDoc(collection(db, 'shops'), newShopObj);
-        shopId = shopDocRef.id;
-        newUserObj.shopId = shopId;
+        const shopDocRef = await addDoc(collection(db, 'shops'), newShopRecord);
+        createdShopId = shopDocRef.id;
+        newUserObj.shopId = createdShopId;
+        finalShopObj = { id: createdShopId, ...newShopRecord };
       }
 
       // 3. Save User to Firestore
       const userDocRef = await addDoc(collection(db, 'users'), newUserObj);
       const userId = userDocRef.id;
 
-      // 4. Update Shop with real Owner ID if created
-      if (shopId) {
-        const shopRef = doc(db, 'shops', shopId);
+      // 4. Update Shop with real Owner ID if it was created
+      if (createdShopId && finalShopObj) {
+        const shopRef = doc(db, 'shops', createdShopId);
         await updateDoc(shopRef, { ownerId: userId });
+        finalShopObj.ownerId = userId;
       }
 
+      const newUserWithId: User = { id: userId, ...newUserObj } as any;
+
       // Update Local State
-      const newUserWithId = { id: userId, ...newUserObj } as User;
-      setState(prev => {
-        const updatedShops = shopId ? [...prev.shops, { id: shopId, ownerId: userId, ...shopData } as Shop] : prev.shops;
-        return {
-          ...prev,
-          allUsers: [...prev.allUsers, newUserWithId],
-          shops: updatedShops
-        };
-      });
+      setState(prev => ({
+        ...prev,
+        allUsers: [...prev.allUsers, newUserWithId],
+        shops: finalShopObj ? [...prev.shops, finalShopObj] : prev.shops
+      }));
 
       return { success: true };
     } catch (error: any) {
-      alert(`Firestore Error: ${error.message}`);
+      console.error("Registration Critical Error:", error);
+      alert(`Registration Error: ${error.message}\nCheck your Firebase configuration or internet connection.`);
       return { success: false, message: error.message };
     }
   };
@@ -174,7 +175,7 @@ const App: React.FC = () => {
   const handleRegisterShop = async (shopData: Partial<Shop>) => {
     if (!state.currentUser) return;
     try {
-      const newShop: Omit<Shop, 'id'> = {
+      const newShopRecord = {
         ownerId: state.currentUser.id,
         code: generateShopCode(shopData.name || 'Shop'),
         name: shopData.name || '',
@@ -189,10 +190,10 @@ const App: React.FC = () => {
         businessHours: [],
         items: [],
         staff: [],
-        ...shopData
-      } as Shop;
+        location: shopData.location || null
+      };
 
-      const docRef = await addDoc(collection(db, 'shops'), newShop);
+      const docRef = await addDoc(collection(db, 'shops'), newShopRecord);
       const shopId = docRef.id;
 
       // Update user document to link to shop
@@ -205,18 +206,22 @@ const App: React.FC = () => {
           ...prev,
           currentUser: updatedUser,
           allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u),
-          shops: [...prev.shops, { id: shopId, ...newShop } as Shop]
+          shops: [...prev.shops, { id: shopId, ...newShopRecord } as Shop]
         };
       });
+      alert("Facility listed successfully!");
     } catch (error: any) {
-      alert(`Error registering shop: ${error.message}`);
+      console.error("Shop registration failed:", error);
+      alert(`Error Registering Shop: ${error.message}`);
     }
   };
 
   const updateShop = async (shopId: string, updates: Partial<Shop>) => {
     try {
       const shopRef = doc(db, 'shops', shopId);
-      await updateDoc(shopRef, updates);
+      // Ensure no undefined values are sent to Firestore
+      const cleanUpdates = JSON.parse(JSON.stringify(updates));
+      await updateDoc(shopRef, cleanUpdates);
 
       setState(prev => {
         const oldShop = prev.shops.find(s => s.id === shopId);
