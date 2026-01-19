@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { collection, addDoc, getDocs, updateDoc, doc, query, where } from 'firebase/firestore';
+import { db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment } from './types';
 import { MOCK_SHOPS } from './constants';
 import LoginPage from './LoginPage';
@@ -22,83 +24,36 @@ const generateShopCode = (name: string): string => {
 };
 
 const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(() => {
-    try {
-      const saved = localStorage.getItem('shopfinder_app_state_v1');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.warn("LocalStorage access denied", e);
-    }
-    return {
-      currentUser: null,
-      shops: MOCK_SHOPS.map(s => ({ ...s, ownerId: 'u1', locationVisible: true })) as Shop[],
-      allUsers: [
-        { id: 'u1', username: 'admin', password: 'password', phone: '08000000000', favorites: [], shopId: 's1' },
-        { id: 'admin_master', username: 'AdminAH', password: 'admin@93', phone: '999', favorites: [], isAdmin: true }
-      ],
-      history: [],
-      comments: []
-    };
+  const [state, setState] = useState<AppState>({
+    currentUser: null,
+    shops: [],
+    allUsers: [],
+    history: [],
+    comments: []
   });
 
   const lastCheckRef = useRef<string>("");
 
+  // Initial Data Load from Firestore
   useEffect(() => {
-    try {
-      localStorage.setItem('shopfinder_app_state_v1', JSON.stringify(state));
-    } catch (e) {}
-  }, [state]);
+    const fetchData = async () => {
+      try {
+        const shopsSnap = await getDocs(collection(db, 'shops'));
+        const usersSnap = await getDocs(collection(db, 'users'));
+        
+        const fetchedShops = shopsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Shop));
+        const fetchedUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() } as User));
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const currentMinute = `${now.getHours()}:${now.getMinutes()}`;
-      if (lastCheckRef.current === currentMinute) return;
-      lastCheckRef.current = currentMinute;
-
-      setState(prev => {
-        let changed = false;
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const currentDay = days[now.getDay()];
-        const currentTimeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-        const newHistory: HistoryItem[] = [];
-        const updatedShops = prev.shops.map(shop => {
-          if (!shop.isAutomatic || !shop.businessHours) return shop;
-          const schedules = shop.businessHours.filter(bh => bh.day === currentDay && bh.enabled);
-          if (schedules.length === 0) return shop;
-
-          for (const schedule of schedules) {
-            if (currentTimeStr === schedule.open && !shop.isOpen) {
-              changed = true;
-              newHistory.push({
-                id: Math.random().toString(36).substr(2, 9),
-                username: 'System (Auto)',
-                action: 'Opened Shop',
-                timestamp: Date.now(),
-                shopId: shop.id
-              });
-              return { ...shop, isOpen: true };
-            }
-            if (currentTimeStr === schedule.close && shop.isOpen) {
-              changed = true;
-              newHistory.push({
-                id: Math.random().toString(36).substr(2, 9),
-                username: 'System (Auto)',
-                action: 'Closed Shop',
-                timestamp: Date.now(),
-                shopId: shop.id
-              });
-              return { ...shop, isOpen: false };
-            }
-          }
-          return shop;
-        });
-
-        return changed ? { ...prev, shops: updatedShops, history: [...prev.history, ...newHistory] } : prev;
-      });
-    }, 5000);
-    return () => clearInterval(interval);
+        setState(prev => ({
+          ...prev,
+          shops: fetchedShops.length > 0 ? fetchedShops : MOCK_SHOPS as any,
+          allUsers: fetchedUsers
+        }));
+      } catch (error: any) {
+        console.error("Fetch error:", error);
+      }
+    };
+    fetchData();
   }, []);
 
   const login = (identifier: string, pass: string, isStaff: boolean, shopCode?: string): boolean => {
@@ -107,7 +62,7 @@ const App: React.FC = () => {
     if (isStaff && shopCode) {
       const shop = state.shops.find(s => s.code.toLowerCase() === shopCode.toLowerCase());
       if (shop) {
-        const staffMember = shop.staff.find(st => st.username === identifier && st.password === pass);
+        const staffMember = shop.staff?.find(st => st.username === identifier && st.password === pass);
         if (staffMember) {
           authenticatedUser = {
             id: staffMember.id,
@@ -142,64 +97,92 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, currentUser: null }));
   };
 
-  const handleRegisterShop = (shopData: Partial<Shop>) => {
-    if (!state.currentUser) return;
-    const newShop: Shop = {
-      id: Math.random().toString(36).substr(2, 9),
-      ownerId: state.currentUser.id,
-      code: generateShopCode(shopData.name || 'Shop'),
-      isOpen: false,
-      isAutomatic: false,
-      locationVisible: true,
-      businessHours: [],
-      items: [],
-      staff: [],
-      contact: state.currentUser.phone,
-      ...shopData
-    } as Shop;
+  const registerUser = async (userData: Partial<User>, shopData?: Partial<Shop>): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const usernameTaken = state.allUsers.some(u => u.username.toLowerCase() === userData.username?.toLowerCase());
+      const phoneTaken = state.allUsers.some(u => u.phone === userData.phone);
 
-    setState(prev => {
-      const updatedUser = { ...prev.currentUser!, shopId: newShop.id };
-      return {
-        ...prev,
-        currentUser: updatedUser,
-        allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u),
-        shops: [...prev.shops, newShop]
+      if (usernameTaken || phoneTaken) {
+        return { success: false, message: "Sorry, that account identifier is already in use!" };
+      }
+
+      // 1. Prepare User Object
+      const newUserObj: Omit<User, 'id'> = {
+        username: userData.username!,
+        password: userData.password!, 
+        phone: userData.phone!,
+        email: userData.email || '',
+        favorites: [],
+        isStaff: false,
+        isAdmin: false
       };
-    });
+
+      // 2. If registering a shop, save shop first to get ID
+      let shopId = '';
+      if (shopData) {
+        const newShopObj: Omit<Shop, 'id'> = {
+          ownerId: 'temp', // Updated after user creation
+          code: generateShopCode(shopData.name || 'Shop'),
+          name: shopData.name || 'My Facility',
+          type: shopData.type || 'General',
+          state: shopData.state || '',
+          lga: shopData.lga || '',
+          address: shopData.address || '',
+          contact: userData.phone!,
+          isOpen: false,
+          isAutomatic: false,
+          locationVisible: true,
+          businessHours: [],
+          items: [],
+          staff: [],
+          location: shopData.location || undefined
+        };
+        
+        const shopDocRef = await addDoc(collection(db, 'shops'), newShopObj);
+        shopId = shopDocRef.id;
+        newUserObj.shopId = shopId;
+      }
+
+      // 3. Save User to Firestore
+      const userDocRef = await addDoc(collection(db, 'users'), newUserObj);
+      const userId = userDocRef.id;
+
+      // 4. Update Shop with real Owner ID if created
+      if (shopId) {
+        const shopRef = doc(db, 'shops', shopId);
+        await updateDoc(shopRef, { ownerId: userId });
+      }
+
+      // Update Local State
+      const newUserWithId = { id: userId, ...newUserObj } as User;
+      setState(prev => {
+        const updatedShops = shopId ? [...prev.shops, { id: shopId, ownerId: userId, ...shopData } as Shop] : prev.shops;
+        return {
+          ...prev,
+          allUsers: [...prev.allUsers, newUserWithId],
+          shops: updatedShops
+        };
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      alert(`Firestore Error: ${error.message}`);
+      return { success: false, message: error.message };
+    }
   };
 
-  const registerUser = (userData: Partial<User>, shopData?: Partial<Shop>): { success: boolean; message?: string } => {
-    const usernameTaken = state.allUsers.some(u => u.username.toLowerCase() === userData.username?.toLowerCase());
-    const phoneTaken = state.allUsers.some(u => u.phone === userData.phone);
-
-    if (usernameTaken || phoneTaken) {
-      return { success: false, message: "Sorry, that account identifier is already in use!" };
-    }
-
-    const userId = Math.random().toString(36).substr(2, 9);
-    const newUser: User = {
-      id: userId,
-      username: userData.username!,
-      password: userData.password!, 
-      phone: userData.phone!,
-      email: userData.email,
-      favorites: [],
-      ...userData
-    } as User;
-
-    let newShop: Shop | undefined;
-    if (shopData) {
-      newShop = {
-        id: Math.random().toString(36).substr(2, 9),
-        ownerId: userId,
+  const handleRegisterShop = async (shopData: Partial<Shop>) => {
+    if (!state.currentUser) return;
+    try {
+      const newShop: Omit<Shop, 'id'> = {
+        ownerId: state.currentUser.id,
         code: generateShopCode(shopData.name || 'Shop'),
-        name: shopData.name || 'My Facility',
-        type: shopData.type || 'General',
+        name: shopData.name || '',
+        type: shopData.type || '',
         state: shopData.state || '',
         lga: shopData.lga || '',
         address: shopData.address || '',
-        contact: shopData.contact || userData.phone!,
+        contact: state.currentUser.phone,
         isOpen: false,
         isAutomatic: false,
         locationVisible: true,
@@ -208,83 +191,96 @@ const App: React.FC = () => {
         staff: [],
         ...shopData
       } as Shop;
-      newUser.shopId = newShop.id;
+
+      const docRef = await addDoc(collection(db, 'shops'), newShop);
+      const shopId = docRef.id;
+
+      // Update user document to link to shop
+      const userRef = doc(db, 'users', state.currentUser.id);
+      await updateDoc(userRef, { shopId: shopId });
+
+      setState(prev => {
+        const updatedUser = { ...prev.currentUser!, shopId: shopId };
+        return {
+          ...prev,
+          currentUser: updatedUser,
+          allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u),
+          shops: [...prev.shops, { id: shopId, ...newShop } as Shop]
+        };
+      });
+    } catch (error: any) {
+      alert(`Error registering shop: ${error.message}`);
     }
-
-    setState(prev => ({
-      ...prev,
-      allUsers: [...prev.allUsers, newUser],
-      shops: newShop ? [...prev.shops, newShop] : prev.shops
-    }));
-
-    return { success: true };
   };
 
-  const updateShop = (shopId: string, updates: Partial<Shop>) => {
-    setState(prev => {
-      const oldShop = prev.shops.find(s => s.id === shopId);
-      const newHistory: HistoryItem[] = [];
-      if (oldShop && updates.isOpen !== undefined && updates.isOpen !== oldShop.isOpen) {
-        newHistory.push({
-          id: Math.random().toString(36).substr(2, 9),
-          username: prev.currentUser?.username || 'Unknown',
-          action: updates.isOpen ? 'Opened Shop' : 'Closed Shop',
-          timestamp: Date.now(),
-          shopId
-        });
-      }
-      return {
-        ...prev,
-        shops: prev.shops.map(s => s.id === shopId ? { ...s, ...updates } : s),
-        history: [...prev.history, ...newHistory]
-      };
-    });
+  const updateShop = async (shopId: string, updates: Partial<Shop>) => {
+    try {
+      const shopRef = doc(db, 'shops', shopId);
+      await updateDoc(shopRef, updates);
+
+      setState(prev => {
+        const oldShop = prev.shops.find(s => s.id === shopId);
+        const newHistory: HistoryItem[] = [];
+        if (oldShop && updates.isOpen !== undefined && updates.isOpen !== oldShop.isOpen) {
+          newHistory.push({
+            id: Math.random().toString(36).substr(2, 9),
+            username: prev.currentUser?.username || 'Unknown',
+            action: updates.isOpen ? 'Opened Shop' : 'Closed Shop',
+            timestamp: Date.now(),
+            shopId
+          });
+        }
+        return {
+          ...prev,
+          shops: prev.shops.map(s => s.id === shopId ? { ...s, ...updates } : s),
+          history: [...prev.history, ...newHistory]
+        };
+      });
+    } catch (error: any) {
+      alert(`Update Error: ${error.message}`);
+    }
   };
 
-  const updatePassword = (newPassword: string) => {
+  const updatePassword = async (newPassword: string) => {
     if (!state.currentUser) return;
-    setState(prev => {
-      const isStaff = prev.currentUser?.isStaff;
-      const updatedUser = { ...prev.currentUser!, password: newPassword };
-      let updatedAllUsers = prev.allUsers;
-      let updatedShops = prev.shops;
+    try {
+      const userRef = doc(db, 'users', state.currentUser.id);
+      await updateDoc(userRef, { password: newPassword });
 
-      if (isStaff) {
-        updatedShops = prev.shops.map(shop => {
-          if (shop.id === prev.currentUser?.shopId) {
-            return {
-              ...shop,
-              staff: shop.staff.map(s => s.id === prev.currentUser?.id ? { ...s, password: newPassword } : s)
-            };
-          }
-          return shop;
-        });
-      } else {
-        updatedAllUsers = prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u);
-      }
-
-      return {
-        ...prev,
-        currentUser: updatedUser,
-        allUsers: updatedAllUsers,
-        shops: updatedShops
-      };
-    });
+      setState(prev => {
+        const updatedUser = { ...prev.currentUser!, password: newPassword };
+        return {
+          ...prev,
+          currentUser: updatedUser,
+          allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+        };
+      });
+    } catch (error: any) {
+      alert(`Password Update Error: ${error.message}`);
+    }
   };
 
-  const toggleFavorite = (shopId: string) => {
+  const toggleFavorite = async (shopId: string) => {
     if (!state.currentUser) return;
-    setState(prev => {
-      const favorites = prev.currentUser!.favorites.includes(shopId)
-        ? prev.currentUser!.favorites.filter(id => id !== shopId)
-        : [...prev.currentUser!.favorites, shopId];
-      const updatedUser = { ...prev.currentUser!, favorites };
-      return {
-        ...prev,
-        currentUser: updatedUser,
-        allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
-      };
-    });
+    try {
+      const favorites = state.currentUser.favorites.includes(shopId)
+        ? state.currentUser.favorites.filter(id => id !== shopId)
+        : [...state.currentUser.favorites, shopId];
+      
+      const userRef = doc(db, 'users', state.currentUser.id);
+      await updateDoc(userRef, { favorites });
+
+      setState(prev => {
+        const updatedUser = { ...prev.currentUser!, favorites };
+        return {
+          ...prev,
+          currentUser: updatedUser,
+          allUsers: prev.allUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
+        };
+      });
+    } catch (error: any) {
+      alert(`Favorite Error: ${error.message}`);
+    }
   };
 
   const addComment = (shopId: string, text: string) => {
@@ -303,15 +299,23 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleResetPassword = (identifier: string, newPassword: string): boolean => {
+  const handleResetPassword = async (identifier: string, newPassword: string): Promise<boolean> => {
     const user = state.allUsers.find(u => u.username === identifier || u.phone === identifier);
     if (!user) return false;
     
-    setState(prev => ({
-      ...prev,
-      allUsers: prev.allUsers.map(u => u.id === user.id ? { ...u, password: newPassword } : u)
-    }));
-    return true;
+    try {
+      const userRef = doc(db, 'users', user.id);
+      await updateDoc(userRef, { password: newPassword });
+      
+      setState(prev => ({
+        ...prev,
+        allUsers: prev.allUsers.map(u => u.id === user.id ? { ...u, password: newPassword } : u)
+      }));
+      return true;
+    } catch (error: any) {
+      alert(`Reset Error: ${error.message}`);
+      return false;
+    }
   };
 
   return (
