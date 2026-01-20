@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, User as UserIcon, Phone, Mail, Lock, Store, MapPin, Navigation, Package, X, Check, Eye, EyeOff } from 'lucide-react';
@@ -6,7 +5,7 @@ import { ALL_STATES, NIGERIA_STATES, BUSINESS_CATEGORIES } from './constants';
 import { User, Shop } from './types';
 
 interface SignupPageProps {
-  onSignup: (user: Partial<User>, shop?: Partial<Shop>) => { success: boolean; message?: string };
+  onSignup: (user: Partial<User>, shop?: Partial<Shop>) => Promise<{ success: boolean; message?: string }>;
 }
 
 const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
@@ -14,6 +13,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
   const [registerShop, setRegisterShop] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '', phone: '', email: '', password: '', confirmPassword: '',
     shopName: '', shopType: '', otherCategory: '', state: '', lga: '', address: '',
@@ -34,10 +34,11 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
             lng: pos.coords.longitude 
           }));
           setIsCapturing(false);
+          alert("Location Captured!");
         },
-        () => {
+        (error) => {
           setIsCapturing(false);
-          alert("Could not fix GPS. Please enter address manually.");
+          alert(`Could not fix GPS: ${error.message}. Please enter address manually.`);
         },
         { enableHighAccuracy: true, timeout: 5000 }
       );
@@ -65,7 +66,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     let shop;
     if (registerShop) {
       const finalCategory = formData.shopType === 'Other' ? formData.otherCategory : formData.shopType;
@@ -90,12 +91,19 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
       password: formData.password 
     };
 
-    const result = onSignup(user, shop);
-    if (result.success) {
-      alert("Account created! Welcome to Shop Finder.");
-      navigate('/login', { replace: true });
-    } else {
-      alert(result.message || "Registration failed.");
+    setIsLoading(true);
+    try {
+      const result = await onSignup(user, shop);
+      if (result.success) {
+        alert("Account created successfully! You can now log in.");
+        navigate('/login', { replace: true });
+      } else {
+        alert(result.message || "Registration failed. Please try again.");
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -209,8 +217,12 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
 
           <div className="flex gap-4 mt-8">
             {step > 1 && <button onClick={() => setStep(step - 1)} className="flex-1 p-4 border-2 rounded-xl font-black text-gray-500 hover:bg-gray-50">Back</button>}
-            <button onClick={step === 2 || (step === 1 && !registerShop) ? handleSubmit : handleNext} className="flex-[2] p-4 bg-blue-700 text-white rounded-xl font-black hover:bg-blue-800 flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-100">
-              {step === 2 || (step === 1 && !registerShop) ? 'Finish Signup' : 'Continue'} <ArrowRight className="h-5 w-5" />
+            <button 
+              onClick={step === 2 || (step === 1 && !registerShop) ? handleSubmit : handleNext} 
+              disabled={isLoading}
+              className="flex-[2] p-4 bg-blue-700 text-white rounded-xl font-black hover:bg-blue-800 flex items-center justify-center gap-2 transition-all shadow-xl shadow-blue-100 disabled:opacity-50"
+            >
+              {isLoading ? 'Processing...' : (step === 2 || (step === 1 && !registerShop) ? 'Finish Signup' : 'Continue')} <ArrowRight className="h-5 w-5" />
             </button>
           </div>
         </div>

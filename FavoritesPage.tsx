@@ -11,9 +11,11 @@ interface FavoritesPageProps {
   onLogout: () => void;
   onToggleFavorite: (id: string) => void;
   onUpdateShop: (id: string, updates: Partial<Shop>) => void;
+  // Added onAddComment to match App.tsx requirements
+  onAddComment?: (shopId: string, text: string) => void;
 }
 
-const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggleFavorite, onUpdateShop }) => {
+const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggleFavorite, onUpdateShop, onAddComment }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const navigate = useNavigate();
@@ -34,7 +36,7 @@ const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggle
         <h1 className="text-3xl font-black text-gray-900 leading-none">My Favorites</h1>
         <p className="text-gray-500 font-bold mt-2">Find anything, anywhere</p>
       </div>
-      <div className="relative mb-8 max-w-xl">
+      <div className="relative mb-8 max-xl">
         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none"><Search className="h-5 w-5 text-gray-400" /></div>
         <input type="text" className="w-full pl-14 pr-6 py-4 bg-white border-2 border-transparent rounded-2xl shadow-sm focus:border-blue-500 outline-none font-bold" placeholder="Search favorite facility..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
@@ -57,7 +59,17 @@ const FavoritesPage: React.FC<FavoritesPageProps> = ({ state, onLogout, onToggle
         ))}
         {favoriteShops.length === 0 && <div className="col-span-full py-16 md:py-32 text-center bg-white rounded-[40px] border-2 border-dashed border-gray-100"><Heart className="h-10 w-10 md:h-16 md:w-16 text-gray-200 mx-auto mb-4" /><p className="font-black text-gray-400 text-sm md:text-xl">No favorites found.</p></div>}
       </div>
-      {selectedShop && <ShopDetailModal shop={selectedShop} isFavorite={true} onClose={() => setSelectedShop(null)} onToggleFavorite={onToggleFavorite} />}
+      {selectedShop && (
+        <ShopDetailModal 
+          shop={selectedShop} 
+          isFavorite={true} 
+          onClose={() => setSelectedShop(null)} 
+          onToggleFavorite={onToggleFavorite}
+          // Pass comments and onAddComment to modal
+          comments={state.comments}
+          onAddComment={onAddComment}
+        />
+      )}
     </Layout>
   );
 };

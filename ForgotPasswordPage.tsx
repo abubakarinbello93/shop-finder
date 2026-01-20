@@ -4,7 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Lock, CheckCircle, ShieldCheck, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 interface ForgotPasswordPageProps {
-  onReset: (identifier: string, newPass: string) => boolean;
+  // Update onReset to support both boolean and Promise<boolean>
+  onReset: (identifier: string, newPass: string) => Promise<boolean> | boolean;
 }
 
 const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
@@ -25,14 +26,17 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onReset }) => {
     setStep(2);
   };
 
-  const handleFinish = (e: React.FormEvent) => {
+  // Change handleFinish to async to handle Promise-based onReset
+  const handleFinish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 4) {
       setError('Password must be at least 4 characters.');
       return;
     }
     
-    if (onReset(identifier, newPassword)) {
+    // Await onReset as it might be a Promise
+    const success = await onReset(identifier, newPassword);
+    if (success) {
       setStep(3);
     } else {
       setError('Account not found. Please check the identifier.');

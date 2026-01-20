@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Store, Package, CheckCircle, Heart, History, ChevronRight, Clock, Navigation, Check, Plus, X } from 'lucide-react';
@@ -16,49 +15,14 @@ interface DashboardProps {
   onAddComment: (shopId: string, text: string) => void;
 }
 
-const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-};
-
 const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite, onUpdateShop, onRegisterShop, onAddComment }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
   const [showRegModal, setShowRegModal] = useState(false);
   const navigate = useNavigate();
 
   const { currentUser, shops, comments } = state;
   const userShop = shops.find(s => s.id === currentUser?.shopId);
-
-  const handleCaptureMyLocation = () => {
-    if (isCapturing) return;
-    setIsCapturing(true);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-          setIsCapturing(false);
-        },
-        (error) => {
-          setIsCapturing(false);
-          alert(`Location access failed: ${error.message}. Enable GPS for proximity features.`);
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    } else {
-      setIsCapturing(false);
-      alert("Geolocation is not supported by this browser.");
-    }
-  };
 
   const getCountdown = (shop: Shop) => {
     if (!shop.isAutomatic || !shop.isOpen) return null;
@@ -102,19 +66,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
       }
     });
 
-    if (userLocation) {
-      results.sort((a, b) => {
-        const distA = (a.shop.location && a.shop.locationVisible) ? getDistance(userLocation.lat, userLocation.lng, a.shop.location.lat, a.shop.location.lng) : 999999;
-        const distB = (b.shop.location && b.shop.locationVisible) ? getDistance(userLocation.lat, userLocation.lng, b.shop.location.lat, b.shop.location.lng) : 999999;
-        return distA - distB;
-      });
-    }
-
     return results;
-  }, [searchTerm, shops, userLocation]);
+  }, [searchTerm, shops]);
 
   const blockItems = useMemo(() => {
-    const items = [
+    const items: { title: string, icon: any, value: string | number, path: string, color: string }[] = [
       { title: 'Discover', icon: CheckCircle, value: shops.filter(s => s.isOpen).length, path: '/available', color: 'bg-indigo-600' },
       { title: 'Favorites', icon: Heart, value: currentUser?.favorites.length || 0, path: '/favorites', color: 'bg-slate-900' },
     ];
@@ -130,7 +86,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
       <header className="mb-8 text-center animate-in fade-in duration-700">
         <div className="bg-blue-50 py-4 px-6 rounded-3xl mb-6 inline-block border border-blue-100 shadow-sm">
            <h2 className="text-lg font-bold text-blue-800">Hello, {currentUser?.username}! 👋</h2>
-           <p className="text-xs font-medium text-blue-600">Welcome to Shop Finder! We're glad to have you back.</p>
+           <p className="text-xs font-medium text-blue-600">Find anything, anywhere in real-time.</p>
         </div>
         
         {userShop ? (
@@ -148,22 +104,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
               How can we help?
             </h1>
             <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-              Discover local services and products in real-time.
+              Discover local services and products instantly.
             </p>
           </div>
         )}
       </header>
-
-      <div className="flex flex-col md:flex-row justify-center items-center gap-3 mb-8">
-        <button 
-          onClick={handleCaptureMyLocation}
-          disabled={isCapturing}
-          className={`flex items-center gap-3 px-5 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm border border-slate-100 ${userLocation ? 'bg-green-600 text-white' : 'bg-white text-[#0f172a] hover:bg-slate-50'}`}
-        >
-          {isCapturing ? <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" /> : (userLocation ? <Check className="h-3 w-3" /> : <Navigation className="h-3 w-3" />)}
-          {isCapturing ? 'Locating...' : (userLocation ? 'Location Active' : 'Enable Proximity')}
-        </button>
-      </div>
 
       <section className="relative mb-12 max-w-2xl mx-auto">
         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
@@ -185,7 +130,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
                   const shop = res.shop;
                   const item = res.item;
                   const countdown = getCountdown(shop);
-                  const distance = (userLocation && shop.location && shop.locationVisible) ? getDistance(userLocation.lat, userLocation.lng, shop.location.lat, shop.location.lng).toFixed(1) : null;
 
                   return (
                     <div 
@@ -196,11 +140,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-0.5">
                           {item && <h3 className="font-black text-blue-600 text-sm uppercase truncate">{item.name}</h3>}
-                          {distance && (
-                            <span className="bg-slate-100 text-slate-600 text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest shrink-0">
-                              {distance} KM
-                            </span>
-                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <h4 className={`font-bold text-[#0f172a] truncate ${item ? 'text-[10px] opacity-60' : 'text-sm uppercase'}`}>{shop.name}</h4>
@@ -299,7 +238,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
                   <item.icon className="h-5 w-5" />
                 </div>
                 <h3 className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-60">{item.title}</h3>
-                {item.value !== '' && <p className="text-xl md:text-3xl font-black mt-1 leading-none">{item.value}</p>}
+                {(item.value as string | number) !== '' && <p className="text-xl md:text-3xl font-black mt-1 leading-none">{item.value}</p>}
               </div>
             </div>
             <div className="absolute top-0 right-0 -mr-4 -mt-4 opacity-[0.05] group-hover:opacity-[0.15] transition-opacity">
@@ -349,10 +288,11 @@ const RegisterShopModal: React.FC<{ onClose: () => void, onSave: (data: Partial<
         (pos) => {
           setFormData(prev => ({ ...prev, lat: pos.coords.latitude, lng: pos.coords.longitude }));
           setIsCapturing(false);
+          alert("GPS Location Linked!");
         },
-        () => {
+        (error) => {
           setIsCapturing(false);
-          alert("GPS fix failed. Ensure location services are enabled.");
+          alert(`GPS fix failed: ${error.message}. Ensure location services are enabled.`);
         },
         { enableHighAccuracy: true, timeout: 5000 }
       );
@@ -371,7 +311,7 @@ const RegisterShopModal: React.FC<{ onClose: () => void, onSave: (data: Partial<
       state: formData.state,
       lga: formData.lga,
       address: formData.address,
-      location: formData.lat ? { lat: formData.lat, lng: formData.lng! } : undefined
+      location: (formData.lat !== null && formData.lng !== null) ? { lat: formData.lat, lng: formData.lng } : undefined
     });
   };
 
