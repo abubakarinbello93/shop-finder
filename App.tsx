@@ -33,16 +33,21 @@ const App: React.FC = () => {
 
   // REAL-TIME LISTENERS (The Single Source of Truth)
   useEffect(() => {
+    // 1. Shops Listener
     const unsubShops = onSnapshot(collection(db, 'shops'), (snapshot) => {
       const fetchedShops = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Shop));
-      setState(prev => ({ ...prev, shops: fetchedShops.length > 0 ? fetchedShops : MOCK_SHOPS as any }));
+      setState(prev => ({ 
+        ...prev, 
+        shops: fetchedShops.length > 0 ? fetchedShops : MOCK_SHOPS as any 
+      }));
     });
 
+    // 2. Users Listener
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const fetchedUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setState(prev => {
         let updatedCurrentUser = prev.currentUser;
-        if (prev.currentUser) {
+        if (prev.currentUser && !prev.currentUser.isStaff) {
           const matching = fetchedUsers.find(u => u.id === prev.currentUser?.id);
           if (matching) updatedCurrentUser = matching;
         }
@@ -50,11 +55,13 @@ const App: React.FC = () => {
       });
     });
 
+    // 3. History Listener
     const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
       const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
       setState(prev => ({ ...prev, history: fetchedHistory }));
     });
 
+    // 4. Comments Listener
     const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
       const fetchedComments = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Comment));
       setState(prev => ({ ...prev, comments: fetchedComments }));
@@ -70,10 +77,12 @@ const App: React.FC = () => {
 
   const login = (identifier: string, pass: string, isStaff: boolean, shopCode?: string): boolean => {
     let authenticatedUser: User | null = null;
+    
     if (isStaff && shopCode) {
+      // Find shop by code and then search its internal staff array
       const shop = state.shops.find(s => s.code.toLowerCase() === shopCode.toLowerCase());
-      if (shop) {
-        const staffMember = shop.staff?.find(st => st.username === identifier && st.password === pass);
+      if (shop && shop.staff) {
+        const staffMember = shop.staff.find(st => st.username === identifier && st.password === pass);
         if (staffMember) {
           authenticatedUser = {
             id: staffMember.id,
@@ -204,8 +213,14 @@ const App: React.FC = () => {
   const updateShop = async (shopId: string, updates: Partial<Shop>) => {
     try {
       const shopRef = doc(db, 'shops', shopId);
-      // Clean undefined fields for Firestore
-      const cleanUpdates = JSON.parse(JSON.stringify(updates));
+      // Clean undefined fields for Firestore safely
+      const cleanUpdates: any = {};
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value !== undefined) {
+          cleanUpdates[key] = value;
+        }
+      });
+      
       await updateDoc(shopRef, cleanUpdates);
 
       const oldShop = state.shops.find(s => s.id === shopId);
@@ -218,6 +233,7 @@ const App: React.FC = () => {
         });
       }
     } catch (error: any) {
+      console.error("Firestore Update Error:", error);
       alert(`Cloud Update Error: ${error.message}`);
     }
   };
