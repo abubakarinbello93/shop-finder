@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment } from './types';
