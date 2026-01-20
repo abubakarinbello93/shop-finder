@@ -301,7 +301,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <MemoryRouter>
+    <BrowserRouter>
       <Routes>
         {!state.currentUser ? (
           <>
@@ -328,7 +328,7 @@ const App: React.FC = () => {
           </>
         )}
       </Routes>
-    </MemoryRouter>
+     </BrowserRouter>
   );
 };
 
