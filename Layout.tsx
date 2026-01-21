@@ -68,11 +68,12 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
   };
 
   const handlePostComment = () => {
-    if (commentText.trim() && shop && onAddComment) {
-      onAddComment(shop.id, commentText.trim());
+    if (commentText.trim() && shop && onUpdateShop) {
+      // Overwrite currentStatus in the shop document
+      onUpdateShop(shop.id, { currentStatus: commentText.trim() });
       setCommentText('');
       setShowCommentModal(false);
-      alert("Status news posted! Users can now see this in the facility catalog.");
+      alert("Status news broadcasted! All users will see this update instantly.");
     }
   };
 
