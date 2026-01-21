@@ -71,25 +71,26 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // 2. AUTOMATIC MODE TIMER (Runs every 60 seconds - Fixed for Nigeria/WAT Time)
+  // 2. AUTOMATIC MODE TIMER (Runs every 60 seconds - Africa/Lagos Timezone)
   useEffect(() => {
     const checkSchedules = async () => {
       if (state.shops.length === 0) return;
 
-      // Get Nigeria (WAT - West Africa Time) - UTC+1
+      // Get current Nigeria time (West Africa Time - WAT)
       const now = new Date();
-      const formatter = new Intl.DateTimeFormat('en-GB', {
+      const nigeriaTime = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'Africa/Lagos',
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
         weekday: 'long'
       });
-      const parts = formatter.formatToParts(now);
+      
+      const parts = nigeriaTime.formatToParts(now);
       const currentDay = parts.find(p => p.type === 'weekday')?.value || '';
-      const hour = parts.find(p => p.type === 'hour')?.value || '00';
-      const minute = parts.find(p => p.type === 'minute')?.value || '00';
-      const currentTime = `${hour}:${minute}`;
+      const hourStr = parts.find(p => p.type === 'hour')?.value || '00';
+      const minStr = parts.find(p => p.type === 'minute')?.value || '00';
+      const currentTime = `${hourStr}:${minStr}`;
 
       for (const shop of state.shops) {
         if (!shop.isAutomatic) continue;
@@ -101,15 +102,16 @@ const App: React.FC = () => {
           shouldBeOpen = currentTime >= schedule.open && currentTime < schedule.close;
         }
 
+        // Automatic Logic: Take over if status doesn't match schedule
         if (shouldBeOpen !== shop.isOpen) {
-          console.log(`Auto-toggling ${shop.name} [Nigeria Time ${currentTime}]: ${shouldBeOpen ? 'OPEN' : 'CLOSE'}`);
+          console.log(`[Auto-Mode] Syncing ${shop.name}: Schedule says ${shouldBeOpen ? 'OPEN' : 'CLOSED'}`);
           await updateShop(shop.id, { isOpen: shouldBeOpen }, true);
         }
       }
     };
 
     const intervalId = setInterval(checkSchedules, 60000);
-    checkSchedules(); 
+    checkSchedules(); // Run immediately
 
     return () => clearInterval(intervalId);
   }, [state.shops]);
@@ -256,14 +258,17 @@ const App: React.FC = () => {
       
       await updateDoc(shopRef, cleanUpdates);
 
-      const oldShop = state.shops.find(s => s.id === shopId);
-      if (oldShop && updates.isOpen !== undefined && updates.isOpen !== oldShop.isOpen) {
-        await addDoc(collection(db, 'history'), {
-          username: isAutoToggle ? 'System Auto-Mode' : (state.currentUser?.username || 'Unknown'),
-          action: updates.isOpen ? 'Opened Facility' : 'Closed Facility',
-          timestamp: Date.now(),
-          shopId
-        });
+      // Log to history if status changed
+      if (updates.isOpen !== undefined) {
+        const targetShop = state.shops.find(s => s.id === shopId);
+        if (targetShop && targetShop.isOpen !== updates.isOpen) {
+           await addDoc(collection(db, 'history'), {
+            username: isAutoToggle ? 'System Auto-Mode' : (state.currentUser?.username || 'Unknown'),
+            action: updates.isOpen ? 'Opened Facility' : 'Closed Facility',
+            timestamp: Date.now(),
+            shopId
+          });
+        }
       }
     } catch (error: any) {
       console.error("Firestore Update Error:", error);
