@@ -91,7 +91,6 @@ const App: React.FC = () => {
           shouldBeOpen = currentTime >= schedule.open && currentTime < schedule.close;
         }
 
-        // Only update if state in cloud is different to avoid infinite loop / redundant writes
         if (shouldBeOpen !== shop.isOpen) {
           console.log(`Auto-toggling ${shop.name}: ${shouldBeOpen ? 'OPEN' : 'CLOSE'}`);
           await updateShop(shop.id, { isOpen: shouldBeOpen }, true);
@@ -100,7 +99,7 @@ const App: React.FC = () => {
     };
 
     const intervalId = setInterval(checkSchedules, 60000);
-    checkSchedules(); // Run immediately on mount
+    checkSchedules(); 
 
     return () => clearInterval(intervalId);
   }, [state.shops]);
@@ -181,6 +180,7 @@ const App: React.FC = () => {
           isOpen: false,
           isAutomatic: false,
           locationVisible: true,
+          currentStatus: '',
           businessHours: [],
           items: [],
           staff: [],
@@ -221,6 +221,7 @@ const App: React.FC = () => {
         isOpen: false,
         isAutomatic: false,
         locationVisible: true,
+        currentStatus: '',
         businessHours: [],
         items: [],
         staff: [],
