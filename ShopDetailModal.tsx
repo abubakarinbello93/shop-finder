@@ -90,7 +90,7 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
             <div className="mb-6 p-6 bg-indigo-50 border-2 border-indigo-100 rounded-[32px] shadow-sm animate-in fade-in duration-500">
                <div className="flex items-center gap-3 mb-2">
                  <Bell className="h-5 w-5 text-indigo-600" />
-                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-700">Latest Broadcast</span>
+                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-700">Official Broadcast</span>
                </div>
                <p className="text-lg font-black text-indigo-900 italic leading-tight">
                  "{shop.currentStatus}"
@@ -161,40 +161,23 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
 
           {activeTab === 'comments' && (
             <div className="space-y-6">
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Operational News Feed</h3>
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Facility News Feed</h3>
               
               <div className="space-y-4">
-                 {shop.currentStatus && (
+                 {shop.currentStatus ? (
                     <div className="p-6 bg-blue-600 rounded-[32px] text-white shadow-xl shadow-blue-100 animate-in slide-in-from-top-4">
                        <div className="flex items-center gap-3 mb-3">
                           <CheckCircle className="h-5 w-5" />
-                          <span className="text-[9px] font-black uppercase tracking-[0.2em]">Latest Official status</span>
+                          <span className="text-[9px] font-black uppercase tracking-[0.2em]">Latest Announcement</span>
                        </div>
                        <p className="text-xl font-black leading-tight">"{shop.currentStatus}"</p>
                     </div>
-                 )}
-
-                 {shopComments.length > 0 ? (
-                  <div className="space-y-4 pt-4 border-t border-slate-100">
-                    {shopComments.map((comment) => (
-                      <div key={comment.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 transition-all">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                            Archive • {new Date(comment.timestamp).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <p className="text-sm font-bold text-slate-700">
-                          {comment.text}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : !shop.currentStatus && (
+                 ) : (
                   <div className="text-center py-16 px-6 bg-gray-50 rounded-[32px] border-2 border-dashed">
                     <Bell className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-                    <p className="text-gray-500 font-black uppercase tracking-widest">No updates at the moment</p>
+                    <p className="text-gray-500 font-black uppercase tracking-widest">No recent broadcasts</p>
                   </div>
-                )}
+                 )}
               </div>
             </div>
           )}
