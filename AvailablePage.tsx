@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, CheckCircle, Package, Store, ArrowLeft, Navigation, MapPin, Filter, X } from 'lucide-react';
@@ -11,6 +10,7 @@ interface AvailablePageProps {
   state: AppState;
   onLogout: () => void;
   onToggleFavorite: (id: string) => void;
+  onUpdateShop: (id: string, updates: Partial<Shop>) => void;
 }
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -25,7 +25,7 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   return R * c;
 };
 
-const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggleFavorite }) => {
+const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggleFavorite, onUpdateShop }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
@@ -89,7 +89,7 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
   }, [shops, searchTerm, userLocation, selectedCategory]);
 
   return (
-    <Layout user={currentUser!} shop={userShop} onLogout={onLogout}>
+    <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
       <div className="mb-8">
         <button 
           onClick={() => navigate('/dashboard')}
