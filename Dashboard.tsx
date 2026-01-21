@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Store, Package, CheckCircle, Heart, History, ChevronRight, Clock, Navigation, Check, Plus, X } from 'lucide-react';
+import { Search, Store, Package, CheckCircle, Heart, History, ChevronRight, Clock, Navigation, Check, Plus, X, Bell } from 'lucide-react';
 import Layout from './Layout';
 import { AppState, Shop } from './types';
 import ShopDetailModal from './ShopDetailModal';
@@ -137,7 +137,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
                       onClick={() => setSelectedShop(shop)}
                       className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center group transition-colors"
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           {item && <h3 className="font-black text-blue-600 text-sm uppercase truncate">{item.name}</h3>}
                         </div>
@@ -145,6 +145,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
                           <h4 className={`font-bold text-[#0f172a] truncate ${item ? 'text-[10px] opacity-60' : 'text-sm uppercase'}`}>{shop.name}</h4>
                           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest shrink-0">{shop.type}</span>
                         </div>
+                        {shop.currentStatus && (
+                          <p className="text-[10px] font-bold text-indigo-600 mt-1 truncate italic">
+                            <Bell className="inline h-3 w-3 mr-1" /> {shop.currentStatus}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 ml-2">
                         <div className="text-right shrink-0">
