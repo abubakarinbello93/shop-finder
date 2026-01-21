@@ -103,13 +103,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
   };
 
   const menuItems = [
-    { title: 'Change Password', desc: 'Update account security', icon: Lock, action: () => { setError(null); setActiveModal('password'); } },
+    { title: 'Security', desc: 'Manage your password', icon: Lock, action: () => { setError(null); setActiveModal('password'); } },
   ];
 
   if (userShop) {
     menuItems.unshift({ 
-      title: 'Business Hour', 
-      desc: 'Opening/Closing schedule', 
+      title: 'Facility Schedule', 
+      desc: 'Set your hours & auto-mode', 
       icon: Clock, 
       action: () => { 
         setTempHours(userShop.businessHours || []); 
@@ -119,8 +119,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
     });
     if (isOwner) {
       menuItems.push({ 
-        title: 'Staff Management', 
-        desc: 'Permissions and accounts', 
+        title: 'Team Management', 
+        desc: 'Staff permissions & access', 
         icon: Users, 
         action: () => setActiveModal('staff') 
       });
@@ -131,22 +131,22 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout}>
       <div className="mb-8">
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-2 hover:gap-3 transition-all">
-          <ArrowLeft className="h-5 w-5" /> Back
+          <ArrowLeft className="h-5 w-5" /> Back to Dashboard
         </button>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Settings</h1>
+        <h1 className="text-3xl font-black text-gray-900 tracking-tight">App Settings</h1>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+      <div className="bg-white rounded-[32px] shadow-sm border overflow-hidden">
         {menuItems.map((item, idx) => (
-          <button key={idx} onClick={item.action} className="w-full flex items-center p-6 hover:bg-gray-50 transition-colors border-b last:border-0 group">
-            <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4 group-hover:scale-105 transition-transform">
+          <button key={idx} onClick={item.action} className="w-full flex items-center p-8 hover:bg-gray-50 transition-colors border-b last:border-0 group">
+            <div className="p-4 bg-blue-100 text-blue-600 rounded-2xl mr-6 group-hover:scale-110 transition-transform">
               <item.icon className="h-6 w-6" />
             </div>
             <div className="text-left flex-1">
-              <h3 className="font-black text-gray-900 text-lg tracking-tight">{item.title}</h3>
-              <p className="text-gray-500 font-bold text-sm">{item.desc}</p>
+              <h3 className="font-black text-gray-900 text-xl tracking-tight leading-tight">{item.title}</h3>
+              <p className="text-gray-500 font-bold text-sm mt-1">{item.desc}</p>
             </div>
-            <ChevronRight className="h-6 w-6 text-gray-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+            <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-2 transition-all" />
           </button>
         ))}
       </div>
@@ -154,19 +154,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       {/* Password Modal */}
       {activeModal === 'password' && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 md:p-8">
+          <div className="bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden p-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Password</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-gray-50 border rounded-full"><X className="h-5 w-5" /></button>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Security</h2>
+              <button onClick={() => setActiveModal(null)} className="p-2 bg-gray-50 border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
             </div>
-            {error && <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r font-bold text-xs flex gap-2"><AlertCircle className="shrink-0 h-4 w-4" />{error}</div>}
+            {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r font-bold text-xs flex gap-2"><AlertCircle className="shrink-0 h-4 w-4" />{error}</div>}
             <div className="space-y-4">
-              <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold" placeholder="Current Password" value={pwdForm.current} onChange={e => setPwdForm({ ...pwdForm, current: e.target.value })} />
-              <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold" placeholder="New Password" value={pwdForm.new} onChange={e => setPwdForm({ ...pwdForm, new: e.target.value })} />
-              <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold" placeholder="Confirm New Password" value={pwdForm.confirm} onChange={e => setPwdForm({ ...pwdForm, confirm: e.target.value })} />
-              <div className="flex gap-4 mt-6">
-                <button onClick={() => setActiveModal(null)} className="flex-1 py-3 font-black text-gray-500">Cancel</button>
-                <button onClick={handlePasswordChange} className="flex-[2] py-3 bg-blue-600 text-white font-black rounded-xl">Update</button>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Password</label>
+                <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-600 outline-none" value={pwdForm.current} onChange={e => setPwdForm({ ...pwdForm, current: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">New Password</label>
+                <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-600 outline-none" value={pwdForm.new} onChange={e => setPwdForm({ ...pwdForm, new: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Confirm New Password</label>
+                <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-600 outline-none" value={pwdForm.confirm} onChange={e => setPwdForm({ ...pwdForm, confirm: e.target.value })} />
+              </div>
+              <div className="flex gap-4 mt-8">
+                <button onClick={() => setActiveModal(null)} className="flex-1 py-4 font-black text-gray-500 text-sm uppercase tracking-widest">Cancel</button>
+                <button onClick={handlePasswordChange} className="flex-[2] py-4 bg-blue-600 text-white font-black rounded-xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm">Update Password</button>
               </div>
             </div>
           </div>
@@ -176,52 +185,53 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       {/* Business Hours Modal */}
       {activeModal === 'hours' && userShop && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Manage Hours</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full"><X className="h-5 w-5" /></button>
+          <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b bg-gray-50/50 flex justify-between items-center">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Facility Schedule</h2>
+              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
-               <div className={`p-4 rounded-2xl mb-6 text-white flex items-center justify-between transition-colors ${isAuto ? 'bg-blue-600' : 'bg-gray-400'}`}>
+            <div className="p-8 overflow-y-auto flex-1">
+               <div className={`p-6 rounded-2xl mb-8 text-white flex items-center justify-between transition-all duration-500 ${isAuto ? 'bg-blue-600 shadow-xl shadow-blue-100' : 'bg-slate-400'}`}>
                 <div>
-                  <h4 className="font-black text-lg">Automatic Mode</h4>
-                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest">Shop flips Open/Closed based on schedule</p>
+                  <h4 className="font-black text-xl uppercase tracking-tight">Automatic Mode</h4>
+                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">Status toggles Open/Closed based on schedule</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" className="sr-only peer" checked={isAuto} onChange={e => setIsAuto(e.target.checked)} />
-                  <div className={`w-14 h-8 bg-white/20 rounded-full flex items-center transition-all px-1 ${isAuto ? 'justify-end' : 'justify-start'}`}>
-                    <div className="h-6 w-6 rounded-full bg-white flex items-center justify-center">
-                      <Check className={`h-3 w-3 ${isAuto ? 'text-blue-600' : 'text-gray-300'}`} />
+                  <div className={`w-16 h-10 bg-white/20 rounded-full flex items-center transition-all px-1.5 ${isAuto ? 'justify-end' : 'justify-start'}`}>
+                    <div className="h-7 w-7 rounded-full bg-white flex items-center justify-center shadow-lg">
+                      <Check className={`h-4 w-4 ${isAuto ? 'text-blue-600' : 'text-slate-300'}`} />
                     </div>
                   </div>
                 </label>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {tempHours.map(bh => (
-                  <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-3 p-4 rounded-xl border bg-gray-50/50">
-                    <span className="font-black text-base text-gray-800 flex-1">{bh.day}</span>
-                    <div className="flex items-center gap-2">
-                      <input type="time" value={bh.open} onChange={e => handleUpdateHours(bh.id, { open: e.target.value })} className="p-2 rounded-lg border font-bold text-sm" />
-                      <span className="font-bold text-gray-400">to</span>
-                      <input type="time" value={bh.close} onChange={e => handleUpdateHours(bh.id, { close: e.target.value })} className="p-2 rounded-lg border font-bold text-sm" />
-                      <button onClick={() => handleRemoveHour(bh.id)} className="p-2 text-red-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                  <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-4 p-5 rounded-2xl border bg-gray-50/50 group hover:bg-white hover:border-blue-100 transition-all">
+                    <span className="font-black text-lg text-slate-800 flex-1 uppercase tracking-tight">{bh.day}</span>
+                    <div className="flex items-center gap-3">
+                      <input type="time" value={bh.open} onChange={e => handleUpdateHours(bh.id, { open: e.target.value })} className="p-3 rounded-xl border-2 border-transparent focus:border-blue-600 bg-white font-black text-sm outline-none" />
+                      <span className="font-black text-slate-300 uppercase text-[10px] tracking-widest">TO</span>
+                      <input type="time" value={bh.close} onChange={e => handleUpdateHours(bh.id, { close: e.target.value })} className="p-3 rounded-xl border-2 border-transparent focus:border-blue-600 bg-white font-black text-sm outline-none" />
+                      <button onClick={() => handleRemoveHour(bh.id)} className="p-3 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="h-5 w-5" /></button>
                     </div>
                   </div>
                 ))}
 
-                <div className="flex gap-2 mt-4 p-4 border-2 border-dashed border-gray-200 rounded-xl bg-slate-50">
-                  <select className="flex-1 p-3 bg-white border rounded-lg font-bold text-sm outline-none" value={dayToAdd} onChange={e => setDayToAdd(e.target.value as BusinessDay)}>
+                <div className="flex gap-3 mt-6 p-6 border-4 border-dashed border-slate-100 rounded-[32px] bg-slate-50/50 items-center">
+                  <Calendar className="h-6 w-6 text-slate-300 shrink-0" />
+                  <select className="flex-1 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-sm outline-none focus:border-blue-600 shadow-sm" value={dayToAdd} onChange={e => setDayToAdd(e.target.value as BusinessDay)}>
                     <option value="">Add schedule for...</option>
                     {availableDays.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
-                  <button onClick={handleAddDay} disabled={!dayToAdd} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-black text-xs disabled:opacity-50 shadow-md shadow-blue-100">Add Day</button>
+                  <button onClick={handleAddDay} disabled={!dayToAdd} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-xs disabled:opacity-50 shadow-xl shadow-blue-100 uppercase tracking-widest">Add</button>
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => setActiveModal(null)} className="px-6 py-3 font-black text-gray-500 text-sm">Cancel</button>
-              <button onClick={handleSaveHours} className="px-10 py-3 bg-blue-600 text-white font-black rounded-xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm">Save Changes</button>
+            <div className="p-8 border-t bg-gray-50 flex justify-end gap-4">
+              <button onClick={() => setActiveModal(null)} className="px-8 py-4 font-black text-slate-500 text-sm uppercase tracking-widest">Discard</button>
+              <button onClick={handleSaveHours} className="px-12 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm hover:bg-blue-700 transition-all">Save Changes</button>
             </div>
           </div>
         </div>
@@ -230,49 +240,52 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       {/* Staff Management Modal */}
       {activeModal === 'staff' && userShop && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Staff Management</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full"><X className="h-5 w-5" /></button>
+          <div className="bg-white w-full max-w-xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b bg-gray-50/50 flex justify-between items-center">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Team Access</h2>
+              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
             </div>
-            <div className="p-6 overflow-y-auto">
-              <button onClick={() => setActiveModal('addStaff')} className="w-full mb-6 p-4 bg-blue-50 border-2 border-dashed border-blue-200 rounded-xl text-blue-600 font-black text-lg flex items-center justify-center gap-2 hover:bg-blue-100 transition-all">
-                <Plus className="h-5 w-5" /> Add New Staff Member
+            <div className="p-8 overflow-y-auto flex-1">
+              <button onClick={() => setActiveModal('addStaff')} className="w-full mb-8 p-6 bg-blue-50 border-4 border-dashed border-blue-100 rounded-[32px] text-blue-600 font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-100 hover:border-blue-200 transition-all group">
+                <UserPlus className="h-6 w-6 group-hover:scale-110 transition-transform" /> Add New Member
               </button>
               
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {(userShop.staff || []).map(member => (
-                  <div key={member.id} className="flex items-center justify-between p-5 bg-white border-2 rounded-2xl hover:border-blue-100 transition-all group">
+                  <div key={member.id} className="flex items-center justify-between p-6 bg-white border-2 border-transparent rounded-3xl shadow-sm hover:border-blue-100 transition-all group">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-lg text-gray-800 block">{member.username}</span>
-                        {member.canAddItems && <span className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-black uppercase">Editor</span>}
+                      <div className="flex items-center gap-3">
+                        <span className="font-black text-xl text-slate-900 leading-none">{member.username}</span>
+                        {member.canAddItems && <span className="text-[9px] bg-green-100 text-green-700 px-2 py-1 rounded-full font-black uppercase tracking-widest">Editor</span>}
                       </div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">PWD: {member.password}</span>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2 flex items-center gap-1.5">
+                        <Lock className="h-3 w-3" /> PWD: <span className="text-slate-600">{member.password}</span>
+                      </p>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-6">
                       <div className="flex flex-col items-center">
-                        <label className="text-[8px] font-black uppercase text-gray-400 mb-1">Items</label>
+                        <label className="text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Edit Inventory</label>
                         <button 
                           onClick={() => handleUpdateStaff(member.id, { canAddItems: !member.canAddItems })}
-                          className={`w-10 h-6 rounded-full transition-all relative flex items-center px-1 ${member.canAddItems ? 'bg-blue-600' : 'bg-gray-200'}`}
+                          className={`w-12 h-7 rounded-full transition-all relative flex items-center px-1 ${member.canAddItems ? 'bg-blue-600' : 'bg-slate-200'}`}
                         >
-                          <div className={`w-4 h-4 bg-white rounded-full shadow transition-all ${member.canAddItems ? 'translate-x-4' : 'translate-x-0'}`} />
+                          <div className={`w-5 h-5 bg-white rounded-full shadow transition-all ${member.canAddItems ? 'translate-x-5' : 'translate-x-0'}`} />
                         </button>
                       </div>
                       <button 
                         onClick={() => onUpdateShop(userShop.id, { staff: userShop.staff.filter(s => s.id !== member.id) })} 
-                        className="p-3 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all"
+                        className="p-4 text-slate-300 hover:bg-red-50 hover:text-red-500 rounded-2xl transition-all"
                       >
-                        <Trash2 className="h-5 w-5" />
+                        <Trash2 className="h-6 w-6" />
                       </button>
                     </div>
                   </div>
                 ))}
 
                 {(!userShop.staff || userShop.staff.length === 0) && (
-                  <div className="py-12 text-center text-gray-300 font-black uppercase tracking-widest text-sm">
-                    No staff members yet.
+                  <div className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-sm flex flex-col items-center gap-4">
+                    <Users className="h-16 w-16 opacity-20" />
+                    No staff members registered.
                   </div>
                 )}
               </div>
@@ -284,24 +297,26 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       {/* Add Staff Detail Modal */}
       {activeModal === 'addStaff' && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 animate-in zoom-in-95">
-            <h2 className="text-2xl font-black text-gray-900 mb-6 uppercase tracking-tight">Add New Staff</h2>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Username</label>
-                <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-black text-sm outline-none focus:border-blue-600 transition-all" placeholder="Enter username" value={newStaff.username} onChange={e => setNewStaff({ ...newStaff, username: e.target.value })} />
+          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden p-10 animate-in zoom-in-95">
+            <h2 className="text-3xl font-black text-slate-900 mb-8 uppercase tracking-tighter leading-none">Register Team</h2>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Staff Username</label>
+                <input className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-base outline-none focus:border-blue-600 transition-all" placeholder="e.g. Ade2024" value={newStaff.username} onChange={e => setNewStaff({ ...newStaff, username: e.target.value })} />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Password</label>
-                <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-black text-sm outline-none focus:border-blue-600 transition-all" placeholder="Enter password" value={newStaff.password} onChange={e => setNewStaff({ ...newStaff, password: e.target.value })} />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Staff Password</label>
+                <input className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-base outline-none focus:border-blue-600 transition-all" placeholder="Secret Key" value={newStaff.password} onChange={e => setNewStaff({ ...newStaff, password: e.target.value })} />
               </div>
-              <div className="flex items-center gap-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
-                 <input type="checkbox" className="w-5 h-5 accent-blue-600" checked={newStaff.canAddItems} onChange={e => setNewStaff({ ...newStaff, canAddItems: e.target.checked })} id="canAdd" />
-                 <label htmlFor="canAdd" className="font-black text-sm text-gray-700 cursor-pointer">Allow this member to add items</label>
+              <div className="flex items-center gap-5 p-6 bg-blue-50/50 border-2 border-blue-100 rounded-3xl cursor-pointer" onClick={() => setNewStaff({ ...newStaff, canAddItems: !newStaff.canAddItems })}>
+                 <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${newStaff.canAddItems ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-100' : 'bg-white border-slate-300'}`}>
+                   {newStaff.canAddItems && <Check className="h-4 w-4 text-white" />}
+                 </div>
+                 <label className="font-black text-sm text-slate-700 cursor-pointer uppercase tracking-tight">Allow inventory updates</label>
               </div>
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => setActiveModal('staff')} className="flex-1 py-4 font-black text-gray-500 text-sm uppercase tracking-widest">Cancel</button>
-                <button onClick={handleAddStaff} className="flex-[2] py-4 bg-blue-600 text-white font-black rounded-xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm">Register Staff</button>
+              <div className="flex gap-4 pt-6">
+                <button onClick={() => setActiveModal('staff')} className="flex-1 py-5 font-black text-slate-400 text-sm uppercase tracking-widest hover:text-slate-600 transition-colors">Back</button>
+                <button onClick={handleAddStaff} className="flex-[2] py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm hover:bg-blue-700 transition-all">Grant Access</button>
               </div>
             </div>
           </div>
