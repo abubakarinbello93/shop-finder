@@ -69,11 +69,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
 
   const handlePostComment = () => {
     if (commentText.trim() && shop && onUpdateShop) {
-      // Overwrite currentStatus in the shop document
+      // Logic: Overwrite the single currentStatus field in the shop document
       onUpdateShop(shop.id, { currentStatus: commentText.trim() });
       setCommentText('');
       setShowCommentModal(false);
-      alert("Status news broadcasted! All users will see this update instantly.");
+      alert("Status broadcast updated! This replaces your previous message.");
     }
   };
 
