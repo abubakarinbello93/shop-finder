@@ -1,17 +1,17 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { History, Clock, ArrowLeft, Trash2 } from 'lucide-react';
 import Layout from './Layout';
-import { AppState } from './types';
+import { AppState, Shop } from './types';
 
 interface HistoryPageProps {
   state: AppState;
   onLogout: () => void;
   onClearHistory: () => void;
+  onUpdateShop: (id: string, updates: Partial<Shop>) => void;
 }
 
-const HistoryPage: React.FC<HistoryPageProps> = ({ state, onLogout, onClearHistory }) => {
+const HistoryPage: React.FC<HistoryPageProps> = ({ state, onLogout, onClearHistory, onUpdateShop }) => {
   const navigate = useNavigate();
   const { currentUser, shops, history } = state;
   const userShop = shops.find(s => s.id === currentUser?.shopId);
@@ -21,7 +21,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ state, onLogout, onClearHisto
     .sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <Layout user={currentUser!} shop={userShop} onLogout={onLogout}>
+    <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
       <div className="mb-8 flex flex-col gap-4">
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black hover:gap-3 transition-all w-fit"><ArrowLeft className="h-5 w-5" /> Back to Dashboard</button>
         <div className="flex justify-between items-end">
