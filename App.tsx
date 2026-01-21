@@ -71,15 +71,25 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // 2. AUTOMATIC MODE TIMER (Runs every 60 seconds)
+  // 2. AUTOMATIC MODE TIMER (Runs every 60 seconds - Fixed for Nigeria/WAT Time)
   useEffect(() => {
     const checkSchedules = async () => {
       if (state.shops.length === 0) return;
 
+      // Get Nigeria (WAT - West Africa Time) - UTC+1
       const now = new Date();
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const currentDay = days[now.getDay()];
-      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Africa/Lagos',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        weekday: 'long'
+      });
+      const parts = formatter.formatToParts(now);
+      const currentDay = parts.find(p => p.type === 'weekday')?.value || '';
+      const hour = parts.find(p => p.type === 'hour')?.value || '00';
+      const minute = parts.find(p => p.type === 'minute')?.value || '00';
+      const currentTime = `${hour}:${minute}`;
 
       for (const shop of state.shops) {
         if (!shop.isAutomatic) continue;
@@ -92,7 +102,7 @@ const App: React.FC = () => {
         }
 
         if (shouldBeOpen !== shop.isOpen) {
-          console.log(`Auto-toggling ${shop.name}: ${shouldBeOpen ? 'OPEN' : 'CLOSE'}`);
+          console.log(`Auto-toggling ${shop.name} [Nigeria Time ${currentTime}]: ${shouldBeOpen ? 'OPEN' : 'CLOSE'}`);
           await updateShop(shop.id, { isOpen: shouldBeOpen }, true);
         }
       }
@@ -340,10 +350,10 @@ const App: React.FC = () => {
               <>
                 <Route path="/dashboard" element={<Dashboard state={state} onLogout={logout} onToggleFavorite={toggleFavorite} onUpdateShop={updateShop} onRegisterShop={handleRegisterShop} onAddComment={addComment} />} />
                 <Route path="/services" element={<ServicesPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
-                <Route path="/available" element={<AvailablePage state={state} onLogout={logout} onToggleFavorite={toggleFavorite} />} />
+                <Route path="/available" element={<AvailablePage state={state} onLogout={logout} onToggleFavorite={toggleFavorite} onUpdateShop={updateShop} />} />
                 <Route path="/favorites" element={<FavoritesPage state={state} onLogout={logout} onToggleFavorite={toggleFavorite} onUpdateShop={updateShop} onAddComment={addComment} />} />
                 <Route path="/settings" element={<SettingsPage state={state} onLogout={logout} onUpdateShop={updateShop} onUpdatePassword={updatePassword} />} />
-                <Route path="/history" element={<HistoryPage state={state} onLogout={logout} onClearHistory={clearHistory} />} />
+                <Route path="/history" element={<HistoryPage state={state} onLogout={logout} onClearHistory={clearHistory} onUpdateShop={updateShop} />} />
               </>
             )}
             <Route path="*" element={<Navigate to={state.currentUser.isAdmin ? "/admin" : "/dashboard"} replace />} />
