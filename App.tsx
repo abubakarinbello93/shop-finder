@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment } from './types';
@@ -31,9 +31,9 @@ const App: React.FC = () => {
     comments: []
   });
 
-  // REAL-TIME LISTENERS (The Single Source of Truth)
+  // REAL-TIME CLOUD LISTENERS
   useEffect(() => {
-    // 1. Shops Listener
+    // 1. Listen for all shops
     const unsubShops = onSnapshot(collection(db, 'shops'), (snapshot) => {
       const fetchedShops = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Shop));
       setState(prev => ({ 
@@ -42,11 +42,12 @@ const App: React.FC = () => {
       }));
     });
 
-    // 2. Users Listener
+    // 2. Listen for all users
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const fetchedUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setState(prev => {
         let updatedCurrentUser = prev.currentUser;
+        // If current user is a regular user (not staff-only mock), sync their profile
         if (prev.currentUser && !prev.currentUser.isStaff) {
           const matching = fetchedUsers.find(u => u.id === prev.currentUser?.id);
           if (matching) updatedCurrentUser = matching;
@@ -55,13 +56,13 @@ const App: React.FC = () => {
       });
     });
 
-    // 3. History Listener
+    // 3. Listen for history
     const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
       const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
       setState(prev => ({ ...prev, history: fetchedHistory }));
     });
 
-    // 4. Comments Listener
+    // 4. Listen for comments/status updates
     const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
       const fetchedComments = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Comment));
       setState(prev => ({ ...prev, comments: fetchedComments }));
@@ -79,7 +80,7 @@ const App: React.FC = () => {
     let authenticatedUser: User | null = null;
     
     if (isStaff && shopCode) {
-      // Find shop by code and then search its internal staff array
+      // Find the shop and check its internal staff list
       const shop = state.shops.find(s => s.code.toLowerCase() === shopCode.toLowerCase());
       if (shop && shop.staff) {
         const staffMember = shop.staff.find(st => st.username === identifier && st.password === pass);
@@ -123,10 +124,9 @@ const App: React.FC = () => {
       const phoneTaken = state.allUsers.some(u => u.phone === userData.phone);
 
       if (usernameTaken || phoneTaken) {
-        return { success: false, message: "Sorry, this username or phone is already taken." };
+        return { success: false, message: "Username or phone is already taken." };
       }
 
-      // 1. Prepare User Object
       const newUserObj = {
         username: userData.username || '',
         password: userData.password || '', 
@@ -140,7 +140,6 @@ const App: React.FC = () => {
 
       let createdShopId: string | null = null;
 
-      // 2. If registering a shop, save shop first to get ID
       if (shopData) {
         const newShopRecord = {
           ownerId: 'pending',
@@ -164,18 +163,16 @@ const App: React.FC = () => {
         (newUserObj as any).shopId = createdShopId;
       }
 
-      // 3. Save User
       const userDocRef = await addDoc(collection(db, 'users'), newUserObj);
       const userId = userDocRef.id;
 
-      // 4. Update Shop with real Owner ID if it exists
       if (createdShopId) {
         await updateDoc(doc(db, 'shops', createdShopId), { ownerId: userId });
       }
 
       return { success: true };
     } catch (error: any) {
-      console.error("Critical Registration Error:", error);
+      console.error("Registration Error:", error);
       alert(`Firestore Error: ${error.message}`);
       return { success: false, message: error.message };
     }
@@ -203,7 +200,7 @@ const App: React.FC = () => {
       };
       const docRef = await addDoc(collection(db, 'shops'), newShopRecord);
       const shopId = docRef.id;
-      await updateDoc(doc(db, 'users', state.currentUser.id), { shopId: shopId });
+      await updateDoc(doc(db, 'users', state.currentUser.id), { shopId });
       alert("Facility listed successfully!");
     } catch (error: any) {
       alert(`Error Registering Shop: ${error.message}`);
@@ -213,16 +210,15 @@ const App: React.FC = () => {
   const updateShop = async (shopId: string, updates: Partial<Shop>) => {
     try {
       const shopRef = doc(db, 'shops', shopId);
-      // Clean undefined fields for Firestore safely
+      // Ensure we only send valid data types to Firestore
       const cleanUpdates: any = {};
       Object.entries(updates).forEach(([key, value]) => {
-        if (value !== undefined) {
-          cleanUpdates[key] = value;
-        }
+        if (value !== undefined) cleanUpdates[key] = value;
       });
       
       await updateDoc(shopRef, cleanUpdates);
 
+      // Log history if status changed
       const oldShop = state.shops.find(s => s.id === shopId);
       if (oldShop && updates.isOpen !== undefined && updates.isOpen !== oldShop.isOpen) {
         await addDoc(collection(db, 'history'), {
@@ -301,7 +297,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <BrowserRouter>
+    <MemoryRouter>
       <Routes>
         {!state.currentUser ? (
           <>
@@ -328,7 +324,7 @@ const App: React.FC = () => {
           </>
         )}
       </Routes>
-     </BrowserRouter>
+    </MemoryRouter>
   );
 };
 
