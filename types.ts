@@ -1,4 +1,3 @@
-
 export type BusinessDay = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export interface BusinessHour {
@@ -54,6 +53,7 @@ export interface Shop {
   isOpen: boolean;
   isAutomatic: boolean;
   locationVisible: boolean;
+  currentStatus?: string; // New field for broadcast updates
   businessHours: BusinessHour[];
   items: ServiceItem[];
   staff: Staff[];
