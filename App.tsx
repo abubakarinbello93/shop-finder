@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
-import { User, Shop, AppState, HistoryItem, Comment } from './types';
+import { User, Shop, AppState, HistoryItem, Comment, BusinessHour } from './types';
 import { MOCK_SHOPS } from './constants';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
@@ -31,9 +31,8 @@ const App: React.FC = () => {
     comments: []
   });
 
-  // REAL-TIME CLOUD LISTENERS
+  // 1. REAL-TIME CLOUD LISTENERS
   useEffect(() => {
-    // 1. Listen for all shops
     const unsubShops = onSnapshot(collection(db, 'shops'), (snapshot) => {
       const fetchedShops = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Shop));
       setState(prev => ({ 
@@ -42,12 +41,10 @@ const App: React.FC = () => {
       }));
     });
 
-    // 2. Listen for all users
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const fetchedUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setState(prev => {
         let updatedCurrentUser = prev.currentUser;
-        // If current user is a regular user (not staff-only mock), sync their profile
         if (prev.currentUser && !prev.currentUser.isStaff) {
           const matching = fetchedUsers.find(u => u.id === prev.currentUser?.id);
           if (matching) updatedCurrentUser = matching;
@@ -56,13 +53,11 @@ const App: React.FC = () => {
       });
     });
 
-    // 3. Listen for history
     const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
       const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
       setState(prev => ({ ...prev, history: fetchedHistory }));
     });
 
-    // 4. Listen for comments/status updates
     const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
       const fetchedComments = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Comment));
       setState(prev => ({ ...prev, comments: fetchedComments }));
@@ -76,11 +71,44 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // 2. AUTOMATIC MODE TIMER (Runs every 60 seconds)
+  useEffect(() => {
+    const checkSchedules = async () => {
+      if (state.shops.length === 0) return;
+
+      const now = new Date();
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const currentDay = days[now.getDay()];
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      for (const shop of state.shops) {
+        if (!shop.isAutomatic) continue;
+
+        const schedule = (shop.businessHours || []).find(bh => bh.day === currentDay && bh.enabled);
+        let shouldBeOpen = false;
+
+        if (schedule) {
+          shouldBeOpen = currentTime >= schedule.open && currentTime < schedule.close;
+        }
+
+        // Only update if state in cloud is different to avoid infinite loop / redundant writes
+        if (shouldBeOpen !== shop.isOpen) {
+          console.log(`Auto-toggling ${shop.name}: ${shouldBeOpen ? 'OPEN' : 'CLOSE'}`);
+          await updateShop(shop.id, { isOpen: shouldBeOpen }, true);
+        }
+      }
+    };
+
+    const intervalId = setInterval(checkSchedules, 60000);
+    checkSchedules(); // Run immediately on mount
+
+    return () => clearInterval(intervalId);
+  }, [state.shops]);
+
   const login = (identifier: string, pass: string, isStaff: boolean, shopCode?: string): boolean => {
     let authenticatedUser: User | null = null;
     
     if (isStaff && shopCode) {
-      // Find the shop and check its internal staff list
       const shop = state.shops.find(s => s.code.toLowerCase() === shopCode.toLowerCase());
       if (shop && shop.staff) {
         const staffMember = shop.staff.find(st => st.username === identifier && st.password === pass);
@@ -207,10 +235,9 @@ const App: React.FC = () => {
     }
   };
 
-  const updateShop = async (shopId: string, updates: Partial<Shop>) => {
+  const updateShop = async (shopId: string, updates: Partial<Shop>, isAutoToggle: boolean = false) => {
     try {
       const shopRef = doc(db, 'shops', shopId);
-      // Ensure we only send valid data types to Firestore
       const cleanUpdates: any = {};
       Object.entries(updates).forEach(([key, value]) => {
         if (value !== undefined) cleanUpdates[key] = value;
@@ -218,19 +245,17 @@ const App: React.FC = () => {
       
       await updateDoc(shopRef, cleanUpdates);
 
-      // Log history if status changed
       const oldShop = state.shops.find(s => s.id === shopId);
       if (oldShop && updates.isOpen !== undefined && updates.isOpen !== oldShop.isOpen) {
         await addDoc(collection(db, 'history'), {
-          username: state.currentUser?.username || 'Unknown',
-          action: updates.isOpen ? 'Opened Shop' : 'Closed Shop',
+          username: isAutoToggle ? 'System Auto-Mode' : (state.currentUser?.username || 'Unknown'),
+          action: updates.isOpen ? 'Opened Facility' : 'Closed Facility',
           timestamp: Date.now(),
           shopId
         });
       }
     } catch (error: any) {
       console.error("Firestore Update Error:", error);
-      alert(`Cloud Update Error: ${error.message}`);
     }
   };
 
