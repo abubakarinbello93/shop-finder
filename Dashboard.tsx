@@ -188,7 +188,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onLogout, onToggleFavorite
                 <Store className="h-8 w-8" />
               </div>
               <div>
-                <h3 className="text-xl font-extrabold text-[#0f172a] tracking-tight uppercase">Add your facility to Shop Finder</h3>
+                <h3 className="text-xl font-extrabold text-[#0f172a] tracking-tight uppercase">Add your facility to Openshop</h3>
                 <p className="text-slate-500 font-bold mt-0.5 text-base">Let customers find your inventory in real-time.</p>
               </div>
             </div>
@@ -389,7 +389,7 @@ const RegisterShopModal: React.FC<{ onClose: () => void, onSave: (data: Partial<
 
         <div className="p-8 border-t bg-slate-50 flex gap-4">
           <button onClick={onClose} className="flex-1 py-4 font-black text-slate-500 uppercase tracking-widest hover:text-slate-700">Discard</button>
-          <button onClick={handleSave} className="flex-[2] py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest hover:bg-blue-700 transition-all">List on Shop Finder</button>
+          <button onClick={handleSave} className="flex-[2] py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest hover:bg-blue-700 transition-all">List on Openshop</button>
         </div>
       </div>
     </div>
