@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
-import { db } from './firebase';
-import { User, Shop, AppState, HistoryItem, Comment, BusinessHour } from './types';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, where } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { User, Shop, AppState, HistoryItem, Comment } from './types';
 import { MOCK_SHOPS } from './constants';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
@@ -23,6 +24,7 @@ const generateShopCode = (name: string): string => {
 };
 
 const App: React.FC = () => {
+  const [loading, setLoading] = useState(true);
   const [state, setState] = useState<AppState>({
     currentUser: null,
     shops: [],
@@ -33,52 +35,74 @@ const App: React.FC = () => {
 
   const lastCheckedTime = useRef<string>('');
 
-  // 1. REAL-TIME CLOUD LISTENERS
+  // 1. AUTH & DATA FETCHING LOGIC
   useEffect(() => {
-    const unsubShops = onSnapshot(collection(db, 'shops'), (snapshot) => {
-      const fetchedShops = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Shop));
-      setState(prev => ({ 
-        ...prev, 
-        shops: fetchedShops.length > 0 ? fetchedShops : MOCK_SHOPS as any 
-      }));
+    // Listen for authentication state changes
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // 2. SETUP AUTHENTICATED LISTENERS
+        // Only fetch collections if auth is confirmed
+        const unsubShops = onSnapshot(collection(db, 'shops'), (snapshot) => {
+          const fetchedShops = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Shop));
+          setState(prev => ({ 
+            ...prev, 
+            shops: fetchedShops.length > 0 ? fetchedShops : MOCK_SHOPS as any 
+          }));
+        });
+
+        // Fetch User Profile from Firestore to match Auth User
+        const userQuery = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
+        const unsubUser = onSnapshot(userQuery, (snapshot) => {
+          if (!snapshot.empty) {
+            const userData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as User;
+            setState(prev => ({ ...prev, currentUser: userData }));
+          }
+          setLoading(false);
+        });
+
+        const unsubAllUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+          const fetchedUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
+          setState(prev => ({ ...prev, allUsers: fetchedUsers }));
+        });
+
+        const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
+          const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
+          setState(prev => ({ ...prev, history: fetchedHistory }));
+        });
+
+        const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
+          const fetchedComments = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Comment));
+          setState(prev => ({ ...prev, comments: fetchedComments }));
+        });
+
+        return () => {
+          unsubShops();
+          unsubUser();
+          unsubAllUsers();
+          unsubHistory();
+          unsubComments();
+        };
+      } else {
+        // 3. USER LOGGED OUT
+        setState({
+          currentUser: null,
+          shops: [],
+          allUsers: [],
+          history: [],
+          comments: []
+        });
+        setLoading(false);
+      }
     });
 
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const fetchedUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
-      setState(prev => {
-        let updatedCurrentUser = prev.currentUser;
-        if (prev.currentUser && !prev.currentUser.isStaff) {
-          const matching = fetchedUsers.find(u => u.id === prev.currentUser?.id);
-          if (matching) updatedCurrentUser = matching;
-        }
-        return { ...prev, allUsers: fetchedUsers, currentUser: updatedCurrentUser };
-      });
-    });
-
-    const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
-      const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
-      setState(prev => ({ ...prev, history: fetchedHistory }));
-    });
-
-    const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
-      const fetchedComments = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Comment));
-      setState(prev => ({ ...prev, comments: fetchedComments }));
-    });
-
-    return () => {
-      unsubShops();
-      unsubUsers();
-      unsubHistory();
-      unsubComments();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
-  // 2. AUTOMATIC MODE TIMER (WAT - Nigeria Time Transition Boundaries)
+  // 4. AUTOMATIC MODE TIMER (WAT - Nigeria Time Transition Boundaries)
   useEffect(() => {
-    const checkSchedules = async () => {
-      if (state.shops.length === 0) return;
+    if (!state.currentUser || state.shops.length === 0) return;
 
-      // Get current Nigeria time (West Africa Time - WAT)
+    const checkSchedules = async () => {
       const now = new Date();
       const nigeriaTime = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'Africa/Lagos',
@@ -94,95 +118,65 @@ const App: React.FC = () => {
       const minStr = parts.find(p => p.type === 'minute')?.value || '00';
       const currentTime = `${hourStr}:${minStr}`;
 
-      // Avoid double processing in the same minute
       if (currentTime === lastCheckedTime.current) return;
       lastCheckedTime.current = currentTime;
 
       for (const shop of state.shops) {
         if (!shop.isAutomatic) continue;
-
         const schedule = (shop.businessHours || []).find(bh => bh.day === currentDay && bh.enabled);
         if (!schedule) continue;
 
-        // SMART RESUMPTION LOGIC:
-        // Only force toggle if we exactly match the boundary time (open or close).
-        // This allows for Manual Override during the day while ensuring the app 
-        // automatically takes over again at the next transition point.
-        if (currentTime === schedule.open) {
-          if (!shop.isOpen) {
-            console.log(`[Auto-Mode] Boundary Match: Opening ${shop.name}`);
-            await updateShop(shop.id, { isOpen: true }, true);
-          }
-        } else if (currentTime === schedule.close) {
-          if (shop.isOpen) {
-            console.log(`[Auto-Mode] Boundary Match: Closing ${shop.name}`);
-            await updateShop(shop.id, { isOpen: false }, true);
-          }
+        if (currentTime === schedule.open && !shop.isOpen) {
+          await updateShop(shop.id, { isOpen: true }, true);
+        } else if (currentTime === schedule.close && shop.isOpen) {
+          await updateShop(shop.id, { isOpen: false }, true);
         }
       }
     };
 
     const intervalId = setInterval(checkSchedules, 60000);
-    checkSchedules(); // Initial check
-
+    checkSchedules();
     return () => clearInterval(intervalId);
-  }, [state.shops]);
+  }, [state.shops, state.currentUser]);
 
-  const login = (identifier: string, pass: string, isStaff: boolean, shopCode?: string): boolean => {
-    let authenticatedUser: User | null = null;
-    
-    if (isStaff && shopCode) {
-      const shop = state.shops.find(s => s.code.toLowerCase() === shopCode.toLowerCase());
-      if (shop && shop.staff) {
-        const staffMember = shop.staff.find(st => st.username === identifier && st.password === pass);
-        if (staffMember) {
-          authenticatedUser = {
-            id: staffMember.id,
-            username: staffMember.username,
-            password: staffMember.password,
-            phone: '',
-            shopId: shop.id,
-            favorites: [],
-            isStaff: true,
-            canAddItems: staffMember.canAddItems
-          };
+  const login = async (identifier: string, pass: string, isStaff: boolean, shopCode?: string): Promise<boolean> => {
+    try {
+      // If the identifier is not an email, we resolve it from our allUsers list or use a mapping
+      let emailToUse = identifier;
+      if (!identifier.includes('@')) {
+        const found = state.allUsers.find(u => u.username === identifier || u.phone === identifier);
+        if (found && found.email) {
+          emailToUse = found.email;
+        } else {
+          // Placeholder email if user only has username/phone in Firestore
+          emailToUse = `${identifier.replace(/\s/g, '')}@openshop.com`;
         }
       }
-    } else {
-      authenticatedUser = state.allUsers.find(u => (u.username === identifier || u.phone === identifier) && u.password === pass) || null;
-    }
 
-    if (authenticatedUser) {
-      setState(prev => ({ ...prev, currentUser: authenticatedUser }));
-      localStorage.setItem('shopfinder_last_user_v1', JSON.stringify({
-        username: authenticatedUser.username,
-        phone: authenticatedUser.phone,
-        isStaff,
-        shopCode
-      }));
+      await signInWithEmailAndPassword(auth, emailToUse, pass);
       return true;
+    } catch (error) {
+      console.error("Auth Login Error:", error);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
-    setState(prev => ({ ...prev, currentUser: null }));
+  const logout = async () => {
+    await signOut(auth);
   };
 
   const registerUser = async (userData: Partial<User>, shopData?: Partial<Shop>): Promise<{ success: boolean; message?: string }> => {
     try {
-      const usernameTaken = state.allUsers.some(u => u.username.toLowerCase() === userData.username?.toLowerCase());
-      const phoneTaken = state.allUsers.some(u => u.phone === userData.phone);
+      const email = userData.email || `${userData.username?.replace(/\s/g, '')}@openshop.com`;
+      
+      // 1. Create User in Firebase Auth
+      await createUserWithEmailAndPassword(auth, email, userData.password || '');
 
-      if (usernameTaken || phoneTaken) {
-        return { success: false, message: "Username or phone is already taken." };
-      }
-
+      // 2. Save Profile in Firestore
       const newUserObj = {
         username: userData.username || '',
-        password: userData.password || '', 
         phone: userData.phone || '',
-        email: userData.email || '',
+        email: email,
         favorites: [],
         isStaff: false,
         isAdmin: false,
@@ -190,7 +184,6 @@ const App: React.FC = () => {
       };
 
       let createdShopId: string | null = null;
-
       if (shopData) {
         const newShopRecord = {
           ownerId: 'pending',
@@ -216,10 +209,8 @@ const App: React.FC = () => {
       }
 
       const userDocRef = await addDoc(collection(db, 'users'), newUserObj);
-      const userId = userDocRef.id;
-
       if (createdShopId) {
-        await updateDoc(doc(db, 'shops', createdShopId), { ownerId: userId });
+        await updateDoc(doc(db, 'shops', createdShopId), { ownerId: userDocRef.id });
       }
 
       return { success: true };
@@ -251,8 +242,7 @@ const App: React.FC = () => {
         location: shopData.location || null
       };
       const docRef = await addDoc(collection(db, 'shops'), newShopRecord);
-      const shopId = docRef.id;
-      await updateDoc(doc(db, 'users', state.currentUser.id), { shopId });
+      await updateDoc(doc(db, 'users', state.currentUser.id), { shopId: docRef.id });
       alert("Facility listed successfully!");
     } catch (error: any) {
       alert(`Error Registering Shop: ${error.message}`);
@@ -266,11 +256,8 @@ const App: React.FC = () => {
       Object.entries(updates).forEach(([key, value]) => {
         if (value !== undefined) cleanUpdates[key] = value;
       });
-      
-      // PERSIST TO FIRESTORE: This triggers real-time updates for all clients via onSnapshot
       await updateDoc(shopRef, cleanUpdates);
 
-      // Track status changes in history
       if (updates.isOpen !== undefined) {
         const targetShop = state.shops.find(s => s.id === shopId);
         if (targetShop && targetShop.isOpen !== updates.isOpen) {
@@ -338,16 +325,32 @@ const App: React.FC = () => {
   const clearHistory = async () => {
     if (!state.currentUser?.shopId) return;
     try {
-      const q = query(collection(db, 'history'));
+      const q = query(collection(db, 'history'), where('shopId', '==', state.currentUser.shopId));
       const snapshot = await getDocs(q);
-      const deletePromises = snapshot.docs
-        .filter(d => d.data().shopId === state.currentUser?.shopId)
-        .map(d => deleteDoc(doc(db, 'history', d.id)));
+      const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, 'history', d.id)));
       await Promise.all(deletePromises);
     } catch (error: any) {
       alert(`Clear Error: ${error.message}`);
     }
   };
+
+  // 5. LOADING SPINNER COMPONENT
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative w-20 h-20">
+            <div className="absolute inset-0 border-4 border-blue-600/20 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <div className="text-center">
+            <h1 className="text-blue-600 font-black text-2xl tracking-tighter uppercase mb-1">OPENSHOP</h1>
+            <p className="font-black text-slate-400 uppercase tracking-widest text-[10px] animate-pulse">Initializing Security...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <MemoryRouter>
