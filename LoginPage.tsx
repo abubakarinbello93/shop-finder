@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Lock, Store, ArrowRight, Eye, EyeOff, UserCheck, ShieldAlert } from 'lucide-react';
+import { User as UserIcon, Lock, Store, ArrowRight, Eye, EyeOff, UserCheck, ShieldAlert, Loader2 } from 'lucide-react';
 
 interface LoginPageProps {
-  onLogin: (identifier: string, password: string, isStaff: boolean, shopCode?: string) => boolean;
+  onLogin: (identifier: string, password: string, isStaff: boolean, shopCode?: string) => Promise<boolean>;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
@@ -13,6 +12,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [shopCode, setShopCode] = useState('');
   const [isStaff, setIsStaff] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [lastUser, setLastUser] = useState<any>(null);
   const [isQuickLogin, setIsQuickLogin] = useState(false);
@@ -38,12 +38,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     } catch(e) {}
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (onLogin(identifier, password, isStaff, shopCode)) {
+    setIsLoading(true);
+    setError('');
+    
+    const success = await onLogin(identifier, password, isStaff, shopCode);
+    if (success) {
       navigate('/dashboard', { replace: true });
     } else {
       setError(isStaff ? 'Invalid Staff Credentials or Facility Code' : 'Invalid identifier or password');
+      setIsLoading(false);
     }
   };
 
@@ -63,7 +68,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 rounded-xl mb-4 shadow-sm border border-blue-100">
             <span className="text-3xl font-black text-[#2563eb]">S</span>
           </div>
-          <h1 className="text-3xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">SHOP FINDER</h1>
+          <h1 className="text-3xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">OPENSHOP</h1>
           <p className="text-slate-400 font-bold mt-2 text-xs tracking-widest uppercase">Find anything, anywhere</p>
         </div>
 
@@ -80,8 +85,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </div>
             <button 
                 type="button"
+                disabled={isLoading}
                 onClick={handleSwitchAccount}
-                className="mt-3 text-[10px] font-black text-[#2563eb] hover:text-blue-800 transition-colors uppercase tracking-widest underline underline-offset-4"
+                className="mt-3 text-[10px] font-black text-[#2563eb] hover:text-blue-800 transition-colors uppercase tracking-widest underline underline-offset-4 disabled:opacity-50"
               >
                 Use another account
             </button>
@@ -97,7 +103,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isQuickLogin && (
             <>
-              <div className="flex items-center gap-2 mb-1 p-3 bg-slate-50 rounded-xl border border-transparent focus-within:border-blue-200 transition-all cursor-pointer" onClick={() => setIsStaff(!isStaff)}>
+              <div className="flex items-center gap-2 mb-1 p-3 bg-slate-50 rounded-xl border border-transparent focus-within:border-blue-200 transition-all cursor-pointer" onClick={() => !isLoading && setIsStaff(!isStaff)}>
                 <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isStaff ? 'bg-[#2563eb] border-[#2563eb]' : 'bg-white border-slate-300'}`}>
                   {isStaff && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                 </div>
@@ -114,7 +120,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   <input
                     type="text"
                     required
-                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300"
+                    disabled={isLoading}
+                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300 disabled:opacity-50"
                     placeholder="Enter Facility Code"
                     value={shopCode}
                     onChange={(e) => setShopCode(e.target.value)}
@@ -129,7 +136,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 <input
                   type="text"
                   required
-                  className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300"
+                  disabled={isLoading}
+                  className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300 disabled:opacity-50"
                   placeholder={isStaff ? "Staff Username" : "Username or phone number"}
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
@@ -146,15 +154,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               ref={passwordInputRef}
               type={showPassword ? "text" : "password"}
               required
-              className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300"
+              disabled={isLoading}
+              className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300 disabled:opacity-50"
               placeholder="Enter Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
             <button
               type="button"
+              disabled={isLoading}
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-[#2563eb] transition-colors"
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-[#2563eb] transition-colors disabled:opacity-50"
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -163,7 +173,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <div className="flex justify-end items-center px-1">
             <Link 
               to="/forgot-password"
-              className="text-[10px] font-black text-[#2563eb] hover:text-blue-800 underline underline-offset-4 uppercase tracking-widest"
+              className={`text-[10px] font-black text-[#2563eb] hover:text-blue-800 underline underline-offset-4 uppercase tracking-widest ${isLoading ? 'pointer-events-none opacity-50' : ''}`}
             >
               Forgot password
             </Link>
@@ -171,9 +181,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
           <button
             type="submit"
-            className="w-full bg-[#2563eb] text-white font-black py-4 rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 group uppercase tracking-widest text-sm"
+            disabled={isLoading}
+            className="w-full bg-[#2563eb] text-white font-black py-4 rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 group uppercase tracking-widest text-sm disabled:opacity-80"
           >
-            {isQuickLogin ? 'Sign In' : 'Enter App'} <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                {isQuickLogin ? 'Sign In' : 'Enter App'} <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
           </button>
         </form>
 
@@ -181,7 +198,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-slate-500 font-bold text-sm">
               Don't have an account?{' '}
-              <Link to="/signup" className="text-[#2563eb] hover:text-blue-800 font-black">
+              <Link to="/signup" className={`text-[#2563eb] hover:text-blue-800 font-black ${isLoading ? 'pointer-events-none' : ''}`}>
                 Join Today
               </Link>
             </p>
