@@ -69,11 +69,12 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
 
   const handlePostComment = () => {
     if (commentText.trim() && shop && onUpdateShop) {
-      // Logic: Overwrite the single currentStatus field in the shop document
+      // OVERWRITE LOGIC: Target the 'currentStatus' field in the shops collection
+      // Using updateDoc through the onUpdateShop prop ensures the cloud sync is immediate.
       onUpdateShop(shop.id, { currentStatus: commentText.trim() });
       setCommentText('');
       setShowCommentModal(false);
-      alert("Status broadcast updated! This replaces your previous message.");
+      alert("Broadcast successful! This update is now live for all users.");
     }
   };
 
@@ -99,7 +100,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
     <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row">
       {/* Mobile Header */}
       <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <h1 className="text-blue-600 font-black text-xl tracking-tighter uppercase">OPENSHOP</h1>
+        <h1 className="text-blue-600 font-black text-xl tracking-tighter uppercase leading-none">OPENSHOP</h1>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
           {isSidebarOpen ? <X /> : <Menu />}
         </button>
@@ -201,7 +202,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center">
-              <h2 className="text-2xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">Status News</h2>
+              <h2 className="text-2xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">Broadcast News</h2>
               <button onClick={() => setShowCommentModal(false)} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-red-50 hover:text-red-500 transition-all"><X className="h-5 w-5" /></button>
             </div>
             <div className="p-8 space-y-6">
@@ -215,7 +216,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
               <div className="relative group">
                 <textarea 
                   className="w-full p-6 bg-slate-50 border-2 border-transparent rounded-3xl font-black text-[#0f172a] focus:border-indigo-600 focus:bg-white outline-none resize-none min-h-[160px] transition-all text-lg shadow-inner"
-                  placeholder="e.g. New fresh stock arrived this morning! Open for deliveries."
+                  placeholder="e.g. Fresh stock arrived this morning! Open for deliveries."
                   maxLength={200}
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
@@ -229,7 +230,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
                 disabled={!commentText.trim()}
                 className="w-full py-5 bg-indigo-600 text-white font-black rounded-3xl shadow-2xl shadow-indigo-100 flex items-center justify-center gap-4 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:shadow-none uppercase tracking-widest text-sm"
               >
-                <Send className="h-6 w-6" /> Broadcast News
+                <Send className="h-6 w-6" /> Send Update
               </button>
             </div>
           </div>
