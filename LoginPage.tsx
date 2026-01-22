@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Lock, Store, ArrowRight, Eye, EyeOff, UserCheck, ShieldAlert, Loader2 } from 'lucide-react';
+import { User as UserIcon, Lock, Store, ArrowRight, Eye, EyeOff, UserCheck, ShieldAlert } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (identifier: string, password: string, isStaff: boolean, shopCode?: string) => Promise<boolean>;
@@ -12,10 +13,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [shopCode, setShopCode] = useState('');
   const [isStaff, setIsStaff] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [lastUser, setLastUser] = useState<any>(null);
   const [isQuickLogin, setIsQuickLogin] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,11 +30,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setIsStaff(parsed.isStaff || false);
         if (parsed.shopCode) setShopCode(parsed.shopCode);
         setIsQuickLogin(true);
-        
-        const timer = setTimeout(() => {
-          if (passwordInputRef.current) passwordInputRef.current.focus();
-        }, 500);
-        return () => clearTimeout(timer);
       }
     } catch(e) {}
   }, []);
@@ -42,7 +38,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
     const success = await onLogin(identifier, password, isStaff, shopCode);
     if (success) {
       navigate('/dashboard', { replace: true });
@@ -63,31 +58,30 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#f8fafc]">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden p-8 md:p-10 animate-in fade-in zoom-in duration-500">
+      <div className="bg-white w-full max-w-md rounded-[32px] shadow-2xl border border-slate-100 overflow-hidden p-8 md:p-12 animate-in fade-in zoom-in duration-500">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 rounded-xl mb-4 shadow-sm border border-blue-100">
-            <span className="text-3xl font-black text-[#2563eb]">S</span>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-600 rounded-[28px] mb-6 shadow-xl shadow-blue-100">
+            <span className="text-4xl font-black text-white">S</span>
           </div>
-          <h1 className="text-3xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">OPENSHOP</h1>
-          <p className="text-slate-400 font-bold mt-2 text-xs tracking-widest uppercase">Find anything, anywhere</p>
+          <h1 className="text-4xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">SHOP FINDER</h1>
+          <p className="text-slate-400 font-bold mt-3 text-xs tracking-widest uppercase">Find anything, anywhere</p>
         </div>
 
-        {isQuickLogin && lastUser && (
-          <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col items-center text-center animate-in slide-in-from-top-2">
-            <div className="p-2 bg-[#2563eb] text-white rounded-lg mb-2 shadow">
-              <UserCheck className="h-5 w-5" />
+        {isQuickLogin && lastUser && !isLoading && (
+          <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col items-center text-center animate-in slide-in-from-top-2">
+            <div className="p-3 bg-blue-600 text-white rounded-xl mb-3 shadow-lg">
+              <UserCheck className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-bold text-[#0f172a]">
-                Welcome back, <span className="text-[#2563eb]">{lastUser.username}</span>
+              <p className="text-base font-black text-[#0f172a]">
+                Welcome back, <span className="text-blue-600">{lastUser.username}</span>
               </p>
-              {lastUser.shopCode && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">CODE: {lastUser.shopCode}</p>}
+              {lastUser.shopCode && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">CODE: {lastUser.shopCode}</p>}
             </div>
             <button 
                 type="button"
-                disabled={isLoading}
                 onClick={handleSwitchAccount}
-                className="mt-3 text-[10px] font-black text-[#2563eb] hover:text-blue-800 transition-colors uppercase tracking-widest underline underline-offset-4 disabled:opacity-50"
+                className="mt-4 text-[10px] font-black text-blue-600 hover:text-blue-800 transition-colors uppercase tracking-[0.2em] underline underline-offset-8"
               >
                 Use another account
             </button>
@@ -95,33 +89,32 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         )}
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-xs font-black rounded-r flex items-center gap-2 animate-in shake duration-300">
-            <ShieldAlert className="h-4 w-4" /> {error}
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-xs font-black rounded-r flex items-center gap-3 animate-in shake duration-300">
+            <ShieldAlert className="h-5 w-5 shrink-0" /> {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {!isQuickLogin && (
             <>
-              <div className="flex items-center gap-2 mb-1 p-3 bg-slate-50 rounded-xl border border-transparent focus-within:border-blue-200 transition-all cursor-pointer" onClick={() => !isLoading && setIsStaff(!isStaff)}>
-                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isStaff ? 'bg-[#2563eb] border-[#2563eb]' : 'bg-white border-slate-300'}`}>
-                  {isStaff && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+              <div className="flex items-center gap-3 mb-2 p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus-within:border-blue-100 transition-all cursor-pointer" onClick={() => setIsStaff(!isStaff)}>
+                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isStaff ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
+                  {isStaff && <div className="w-2 h-2 bg-white rounded-full" />}
                 </div>
-                <label className="text-[10px] font-black text-[#0f172a] cursor-pointer select-none uppercase tracking-widest">
+                <label className="text-xs font-black text-[#0f172a] cursor-pointer select-none uppercase tracking-widest">
                   Login as Facility Staff
                 </label>
               </div>
 
               {isStaff && (
                 <div className="relative group animate-in slide-in-from-top-2 duration-200">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Store className="h-5 w-5 text-slate-400 group-focus-within:text-[#2563eb] transition-colors" />
+                  <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                    <Store className="h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                   </div>
                   <input
                     type="text"
                     required
-                    disabled={isLoading}
-                    className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300 disabled:opacity-50"
+                    className="block w-full pl-12 pr-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 focus:bg-white focus:outline-none transition-all font-black text-[#0f172a] placeholder:text-slate-300 shadow-inner"
                     placeholder="Enter Facility Code"
                     value={shopCode}
                     onChange={(e) => setShopCode(e.target.value)}
@@ -130,14 +123,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               )}
 
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <UserIcon className="h-5 w-5 text-slate-400 group-focus-within:text-[#2563eb] transition-colors" />
+                <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                  <UserIcon className="h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
                 </div>
                 <input
                   type="text"
                   required
-                  disabled={isLoading}
-                  className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300 disabled:opacity-50"
+                  className="block w-full pl-12 pr-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 focus:bg-white focus:outline-none transition-all font-black text-[#0f172a] placeholder:text-slate-300 shadow-inner"
                   placeholder={isStaff ? "Staff Username" : "Username or phone number"}
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
@@ -147,24 +139,22 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           )}
 
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-[#2563eb] transition-colors" />
+            <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
             </div>
             <input
               ref={passwordInputRef}
               type={showPassword ? "text" : "password"}
               required
-              disabled={isLoading}
-              className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl focus:border-[#2563eb] focus:bg-white focus:outline-none transition-all font-bold text-[#0f172a] placeholder:text-slate-300 disabled:opacity-50"
+              className="block w-full pl-12 pr-12 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 focus:bg-white focus:outline-none transition-all font-black text-[#0f172a] placeholder:text-slate-300 shadow-inner"
               placeholder="Enter Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
             <button
               type="button"
-              disabled={isLoading}
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-[#2563eb] transition-colors disabled:opacity-50"
+              className="absolute inset-y-0 right-0 pr-5 flex items-center text-slate-300 hover:text-blue-600 transition-colors"
             >
               {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
@@ -173,32 +163,27 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <div className="flex justify-end items-center px-1">
             <Link 
               to="/forgot-password"
-              className={`text-[10px] font-black text-[#2563eb] hover:text-blue-800 underline underline-offset-4 uppercase tracking-widest ${isLoading ? 'pointer-events-none opacity-50' : ''}`}
+              className="text-[10px] font-black text-blue-600 hover:text-blue-800 underline underline-offset-8 uppercase tracking-[0.2em]"
             >
-              Forgot password
+              Forgot password?
             </Link>
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-[#2563eb] text-white font-black py-4 rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 group uppercase tracking-widest text-sm disabled:opacity-80"
+            className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 group uppercase tracking-widest text-sm disabled:opacity-50"
           >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                {isQuickLogin ? 'Sign In' : 'Enter App'} <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
+            {isLoading ? 'Authenticating...' : (isQuickLogin ? 'Sign In' : 'Enter Shop Finder')} 
+            {!isLoading && <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />}
           </button>
         </form>
 
-        {!isQuickLogin && (
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-            <p className="text-slate-500 font-bold text-sm">
-              Don't have an account?{' '}
-              <Link to="/signup" className={`text-[#2563eb] hover:text-blue-800 font-black ${isLoading ? 'pointer-events-none' : ''}`}>
+        {!isQuickLogin && !isLoading && (
+          <div className="mt-10 pt-8 border-t border-slate-100 text-center">
+            <p className="text-slate-400 font-bold text-sm">
+              New to Shop Finder?{' '}
+              <Link to="/signup" className="text-blue-600 hover:text-blue-800 font-black decoration-2 underline underline-offset-4">
                 Join Today
               </Link>
             </p>
