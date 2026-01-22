@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
@@ -30,6 +30,8 @@ const App: React.FC = () => {
     history: [],
     comments: []
   });
+
+  const lastCheckedTime = useRef<string>('');
 
   // 1. REAL-TIME CLOUD LISTENERS
   useEffect(() => {
@@ -71,7 +73,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // 2. AUTOMATIC MODE TIMER (Runs every 60 seconds - Africa/Lagos Timezone)
+  // 2. AUTOMATIC MODE TIMER (WAT - Nigeria Time Transition Boundaries)
   useEffect(() => {
     const checkSchedules = async () => {
       if (state.shops.length === 0) return;
@@ -92,26 +94,36 @@ const App: React.FC = () => {
       const minStr = parts.find(p => p.type === 'minute')?.value || '00';
       const currentTime = `${hourStr}:${minStr}`;
 
+      // Avoid double processing in the same minute
+      if (currentTime === lastCheckedTime.current) return;
+      lastCheckedTime.current = currentTime;
+
       for (const shop of state.shops) {
         if (!shop.isAutomatic) continue;
 
         const schedule = (shop.businessHours || []).find(bh => bh.day === currentDay && bh.enabled);
-        let shouldBeOpen = false;
+        if (!schedule) continue;
 
-        if (schedule) {
-          shouldBeOpen = currentTime >= schedule.open && currentTime < schedule.close;
-        }
-
-        // Automatic Logic: Take over if status doesn't match schedule
-        if (shouldBeOpen !== shop.isOpen) {
-          console.log(`[Auto-Mode] Syncing ${shop.name}: Schedule says ${shouldBeOpen ? 'OPEN' : 'CLOSED'}`);
-          await updateShop(shop.id, { isOpen: shouldBeOpen }, true);
+        // SMART RESUMPTION LOGIC:
+        // Only force toggle if we exactly match the boundary time (open or close).
+        // This allows for Manual Override during the day while ensuring the app 
+        // automatically takes over again at the next transition point.
+        if (currentTime === schedule.open) {
+          if (!shop.isOpen) {
+            console.log(`[Auto-Mode] Boundary Match: Opening ${shop.name}`);
+            await updateShop(shop.id, { isOpen: true }, true);
+          }
+        } else if (currentTime === schedule.close) {
+          if (shop.isOpen) {
+            console.log(`[Auto-Mode] Boundary Match: Closing ${shop.name}`);
+            await updateShop(shop.id, { isOpen: false }, true);
+          }
         }
       }
     };
 
     const intervalId = setInterval(checkSchedules, 60000);
-    checkSchedules(); // Run immediately
+    checkSchedules(); // Initial check
 
     return () => clearInterval(intervalId);
   }, [state.shops]);
@@ -213,7 +225,6 @@ const App: React.FC = () => {
       return { success: true };
     } catch (error: any) {
       console.error("Registration Error:", error);
-      alert(`Firestore Error: ${error.message}`);
       return { success: false, message: error.message };
     }
   };
@@ -256,9 +267,10 @@ const App: React.FC = () => {
         if (value !== undefined) cleanUpdates[key] = value;
       });
       
+      // PERSIST TO FIRESTORE: This triggers real-time updates for all clients via onSnapshot
       await updateDoc(shopRef, cleanUpdates);
 
-      // Log to history if status changed
+      // Track status changes in history
       if (updates.isOpen !== undefined) {
         const targetShop = state.shops.find(s => s.id === shopId);
         if (targetShop && targetShop.isOpen !== updates.isOpen) {
