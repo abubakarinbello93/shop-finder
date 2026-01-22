@@ -1,3 +1,4 @@
+
 import React, { ReactNode, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
@@ -69,8 +70,6 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
 
   const handlePostComment = () => {
     if (commentText.trim() && shop && onUpdateShop) {
-      // OVERWRITE LOGIC: Target the 'currentStatus' field in the shops collection
-      // Using updateDoc through the onUpdateShop prop ensures the cloud sync is immediate.
       onUpdateShop(shop.id, { currentStatus: commentText.trim() });
       setCommentText('');
       setShowCommentModal(false);
@@ -98,15 +97,15 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row">
-      {/* Mobile Header */}
+      {/* Mobile Header - Phone View Branding */}
       <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <h1 className="text-blue-600 font-black text-xl tracking-tighter uppercase leading-none">OPENSHOP</h1>
+        <h1 className="text-blue-600 font-black text-xl tracking-tighter uppercase leading-none">SHOP FINDER</h1>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
           {isSidebarOpen ? <X /> : <Menu />}
         </button>
       </div>
 
-      {/* Sidebar */}
+      {/* Sidebar - Computer View Branding */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-72 bg-white border-r transform transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0
@@ -115,9 +114,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
         <div className="h-full flex flex-col">
           <div className="p-8 hidden md:flex items-center gap-4">
              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-100">
-                <span className="text-white font-black text-2xl">O</span>
+                <span className="text-white font-black text-2xl">S</span>
              </div>
-             <h1 className="text-blue-600 font-black text-2xl tracking-tighter uppercase leading-none">OPENSHOP</h1>
+             <h1 className="text-blue-600 font-black text-2xl tracking-tighter uppercase leading-none">SHOP FINDER</h1>
           </div>
 
           <div className="px-8 py-2 mb-8">
