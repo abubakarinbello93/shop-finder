@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User as UserIcon, Lock, Store, ArrowRight, Eye, EyeOff, UserCheck, ShieldAlert } from 'lucide-react';
@@ -26,7 +25,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       if (saved) {
         const parsed = JSON.parse(saved);
         setLastUser(parsed);
-        setIdentifier(parsed.username || parsed.phone);
+        setIdentifier(parsed.phone || parsed.username || '');
         setIsStaff(parsed.isStaff || false);
         if (parsed.shopCode) setShopCode(parsed.shopCode);
         setIsQuickLogin(true);
@@ -42,7 +41,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     if (success) {
       navigate('/dashboard', { replace: true });
     } else {
-      setError(isStaff ? 'Invalid Staff Credentials or Facility Code' : 'Invalid identifier or password');
+      setError(isStaff ? 'Invalid Staff Credentials or Facility Code' : 'Invalid phone number or password');
       setIsLoading(false);
     }
   };
@@ -130,7 +129,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   type="text"
                   required
                   className="block w-full pl-12 pr-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-600 focus:bg-white focus:outline-none transition-all font-black text-[#0f172a] placeholder:text-slate-300 shadow-inner"
-                  placeholder={isStaff ? "Staff Username" : "Username or phone number"}
+                  placeholder={isStaff ? "Staff Username" : "Phone Number"}
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                 />
