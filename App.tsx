@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc, where } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment, BusinessHour } from './types';
@@ -44,26 +45,39 @@ const App: React.FC = () => {
 
   // 1. AUTH STATE OBSERVER
   useEffect(() => {
-    // Ensuring solely relying on onAuthStateChanged for security
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // User is logged in, fetch their profile from Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          const userData = { id: userDoc.id, ...userDoc.data() } as User;
-          setState(prev => ({ ...prev, currentUser: userData }));
-        } else {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = { id: userDoc.id, ...userDoc.data() } as User;
+            setState(prev => ({ ...prev, currentUser: userData }));
+            // Remember user on successful auth state detection
+            if (userData.phone) {
+              localStorage.setItem('rememberedPhone', userData.phone);
+            }
+          } else {
+            // Handle cases where auth exists but profile doesn't (or is a custom staff session)
+            if (!state.currentUser?.isStaff) {
+              setState(prev => ({ ...prev, currentUser: null }));
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching user profile:", err);
           setState(prev => ({ ...prev, currentUser: null }));
         }
       } else {
-        // User is logged out
-        setState(prev => ({ ...prev, currentUser: null }));
+        // Only clear if not a staff member (since staff might not use Firebase Auth)
+        setState(prev => {
+          if (prev.currentUser?.isStaff) return prev;
+          return { ...prev, currentUser: null };
+        });
       }
       setLoading(false);
     });
 
     return () => unsubscribeAuth();
-  }, []);
+  }, [state.currentUser?.isStaff]);
 
   // 2. REAL-TIME CLOUD LISTENERS (Conditional on Auth)
   useEffect(() => {
@@ -81,6 +95,7 @@ const App: React.FC = () => {
       const fetchedUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setState(prev => {
         const matching = fetchedUsers.find(u => u.id === prev.currentUser?.id);
+        if (prev.currentUser?.isStaff) return { ...prev, allUsers: fetchedUsers };
         return { ...prev, allUsers: fetchedUsers, currentUser: matching || prev.currentUser };
       });
     });
@@ -148,8 +163,46 @@ const App: React.FC = () => {
   const login = async (identifier: string, pass: string, isStaff: boolean, shopCode?: string): Promise<boolean> => {
     try {
       setLoading(true);
+      
+      if (isStaff && shopCode) {
+        // Custom Staff Login Logic
+        const shopsRef = collection(db, 'shops');
+        const q = query(shopsRef, where("code", "==", shopCode));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          setLoading(false);
+          return false;
+        }
+
+        const shopDoc = querySnapshot.docs[0];
+        const shopData = shopDoc.data() as Shop;
+        const staffMember = (shopData.staff || []).find(s => s.username === identifier && s.password === pass);
+
+        if (staffMember) {
+          const staffUser: User = {
+            id: staffMember.id,
+            username: staffMember.username,
+            phone: '', // Staff login might not have a phone linked directly in user profile
+            isStaff: true,
+            shopId: shopDoc.id,
+            canAddItems: staffMember.canAddItems,
+            favorites: []
+          };
+          setState(prev => ({ ...prev, currentUser: staffUser }));
+          // Remember staff username
+          localStorage.setItem('rememberedPhone', identifier);
+          setLoading(false);
+          return true;
+        }
+        setLoading(false);
+        return false;
+      }
+
+      // Regular User Login
       const email = identifierToEmail(identifier);
       await signInWithEmailAndPassword(auth, email, pass);
+      // localStorage is handled in onAuthStateChanged
       return true;
     } catch (error) {
       console.error("Login Error:", error);
@@ -160,6 +213,7 @@ const App: React.FC = () => {
 
   const logout = async () => {
     await signOut(auth);
+    setState(prev => ({ ...prev, currentUser: null }));
   };
 
   const registerUser = async (userData: Partial<User>, shopData?: Partial<Shop>): Promise<{ success: boolean; message?: string }> => {
@@ -176,46 +230,57 @@ const App: React.FC = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, userData.password!);
       const userId = userCredential.user.uid;
 
-      // 2. Create User Profile in Firestore
-      const newUserObj = {
-        username: userData.username || '',
-        phone: userData.phone || '',
-        email: email,
-        favorites: [],
-        isStaff: false,
-        isAdmin: false,
-        shopId: null
-      };
-
-      let createdShopId: string | null = null;
-      if (shopData) {
-        const newShopRecord = {
-          ownerId: userId,
-          code: generateShopCode(shopData.name || 'Shop'),
-          name: shopData.name || 'My Facility',
-          type: shopData.type || 'General',
-          state: shopData.state || '',
-          lga: shopData.lga || '',
-          address: shopData.address || '',
-          contact: userData.phone || '',
-          isOpen: false,
-          isAutomatic: false,
-          locationVisible: true,
-          currentStatus: '',
-          businessHours: [],
-          items: [],
-          staff: [],
-          location: shopData.location || null
+      // 2. Wrap Firestore calls in try/catch to handle specific permission/confirmations
+      try {
+        const newUserObj = {
+          username: userData.username || '',
+          phone: userData.phone || '',
+          email: email,
+          favorites: [],
+          isStaff: false,
+          isAdmin: false,
+          shopId: null
         };
-        const shopDocRef = await addDoc(collection(db, 'shops'), newShopRecord);
-        createdShopId = shopDocRef.id;
-        (newUserObj as any).shopId = createdShopId;
-      }
 
-      await setDoc(doc(db, 'users', userId), newUserObj);
-      return { success: true };
+        if (shopData) {
+          const newShopRecord = {
+            ownerId: userId,
+            code: generateShopCode(shopData.name || 'Shop'),
+            name: shopData.name || 'My Facility',
+            type: shopData.type || 'General',
+            state: shopData.state || '',
+            lga: shopData.lga || '',
+            address: shopData.address || '',
+            contact: userData.phone || '',
+            isOpen: false,
+            isAutomatic: false,
+            locationVisible: true,
+            currentStatus: '',
+            businessHours: [],
+            items: [],
+            staff: [],
+            location: shopData.location || null
+          };
+          // Wait for confirmation
+          const shopDocRef = await addDoc(collection(db, 'shops'), newShopRecord);
+          newUserObj.shopId = shopDocRef.id;
+        }
+
+        // Wait for profile confirmation
+        await setDoc(doc(db, 'users', userId), newUserObj);
+        
+        // Success: Remember the phone
+        if (userData.phone) {
+          localStorage.setItem('rememberedPhone', userData.phone);
+        }
+
+        return { success: true };
+      } catch (firestoreErr: any) {
+        console.error("Firestore error during registration:", firestoreErr);
+        return { success: false, message: "Profile created, but database configuration failed: " + firestoreErr.message };
+      }
     } catch (error: any) {
-      console.error("Registration Error:", error);
+      console.error("Auth Registration Error:", error);
       setLoading(false);
       if (error.code === 'auth/email-already-in-use') {
         return { success: false, message: 'This phone number is already registered.' };
@@ -227,6 +292,7 @@ const App: React.FC = () => {
   const handleRegisterShop = async (shopData: Partial<Shop>) => {
     if (!state.currentUser) return;
     try {
+      setLoading(true);
       const newShopRecord = {
         ownerId: state.currentUser.id,
         code: generateShopCode(shopData.name || 'Shop'),
@@ -245,12 +311,19 @@ const App: React.FC = () => {
         staff: [],
         location: shopData.location || null
       };
+      
+      // Explicitly wait for database success
       const docRef = await addDoc(collection(db, 'shops'), newShopRecord);
       const shopId = docRef.id;
+      
       await updateDoc(doc(db, 'users', state.currentUser.id), { shopId });
+      
       alert("Facility listed successfully!");
+      setLoading(false);
     } catch (error: any) {
-      alert(`Error Registering Shop: ${error.message}`);
+      setLoading(false);
+      console.error("Error Registering Shop:", error);
+      alert(`Permissions/Database Error: ${error.message}`);
     }
   };
 
