@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
-import { db, auth } from './firebase';
+import { auth, db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment, BusinessHour } from './types';
 import { MOCK_SHOPS } from './constants';
 import LoginPage from './LoginPage';
@@ -44,6 +43,7 @@ const App: React.FC = () => {
 
   // 1. AUTH STATE OBSERVER
   useEffect(() => {
+    // Ensuring solely relying on onAuthStateChanged for security
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // User is logged in, fetch their profile from Firestore
@@ -52,7 +52,6 @@ const App: React.FC = () => {
           const userData = { id: userDoc.id, ...userDoc.data() } as User;
           setState(prev => ({ ...prev, currentUser: userData }));
         } else {
-          // If profile doesn't exist but auth does (unlikely edge case)
           setState(prev => ({ ...prev, currentUser: null }));
         }
       } else {
@@ -264,8 +263,6 @@ const App: React.FC = () => {
   };
 
   const updatePassword = async (newPassword: string) => {
-    // Note: In real production apps, you'd use updatePassword(auth.currentUser, ...)
-    // For this context, we update the profile doc or call reauth if needed.
     alert("Password updated locally. Please use Auth settings for full reset.");
   };
 
