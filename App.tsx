@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc, where, orderBy, limit, writeBatch } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment, BusinessHour } from './types';
@@ -52,12 +52,10 @@ const App: React.FC = () => {
           if (userDoc.exists()) {
             const userData = { id: userDoc.id, ...userDoc.data() } as User;
             setState(prev => ({ ...prev, currentUser: userData }));
-            // Remember user on successful auth state detection
             if (userData.phone) {
               localStorage.setItem('rememberedPhone', userData.phone);
             }
           } else {
-            // Handle cases where auth exists but profile doesn't (or is a custom staff session)
             if (!state.currentUser?.isStaff) {
               setState(prev => ({ ...prev, currentUser: null }));
             }
@@ -67,7 +65,6 @@ const App: React.FC = () => {
           setState(prev => ({ ...prev, currentUser: null }));
         }
       } else {
-        // Only clear if not a staff member (since staff might not use Firebase Auth)
         setState(prev => {
           if (prev.currentUser?.isStaff) return prev;
           return { ...prev, currentUser: null };
@@ -79,7 +76,7 @@ const App: React.FC = () => {
     return () => unsubscribeAuth();
   }, [state.currentUser?.isStaff]);
 
-  // 2. REAL-TIME CLOUD LISTENERS (Conditional on Auth)
+  // 2. REAL-TIME CLOUD LISTENERS
   useEffect(() => {
     if (!state.currentUser) return;
 
@@ -100,21 +97,22 @@ const App: React.FC = () => {
       });
     });
 
-    const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
-      const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
-      setState(prev => ({ ...prev, history: fetchedHistory }));
-    });
-
     const unsubComments = onSnapshot(collection(db, 'comments'), (snapshot) => {
       const fetchedComments = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Comment));
       setState(prev => ({ ...prev, comments: fetchedComments }));
     });
 
+    // Add a listener for the global history collection to populate Admin dashboard and User feeds
+    const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
+      const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
+      setState(prev => ({ ...prev, history: fetchedHistory }));
+    });
+
     return () => {
       unsubShops();
       unsubUsers();
-      unsubHistory();
       unsubComments();
+      unsubHistory();
     };
   }, [state.currentUser?.id]);
 
@@ -165,7 +163,6 @@ const App: React.FC = () => {
       setLoading(true);
       
       if (isStaff && shopCode) {
-        // Custom Staff Login Logic
         const shopsRef = collection(db, 'shops');
         const q = query(shopsRef, where("code", "==", shopCode));
         const querySnapshot = await getDocs(q);
@@ -183,14 +180,13 @@ const App: React.FC = () => {
           const staffUser: User = {
             id: staffMember.id,
             username: staffMember.username,
-            phone: '', // Staff login might not have a phone linked directly in user profile
+            phone: '',
             isStaff: true,
             shopId: shopDoc.id,
             canAddItems: staffMember.canAddItems,
             favorites: []
           };
           setState(prev => ({ ...prev, currentUser: staffUser }));
-          // Remember staff username
           localStorage.setItem('rememberedPhone', identifier);
           setLoading(false);
           return true;
@@ -199,10 +195,8 @@ const App: React.FC = () => {
         return false;
       }
 
-      // Regular User Login
       const email = identifierToEmail(identifier);
       await signInWithEmailAndPassword(auth, email, pass);
-      // localStorage is handled in onAuthStateChanged
       return true;
     } catch (error) {
       console.error("Login Error:", error);
@@ -226,11 +220,9 @@ const App: React.FC = () => {
       const loginIdentifier = userData.phone || userData.username!;
       const email = identifierToEmail(loginIdentifier);
       
-      // 1. Create Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, email, userData.password!);
       const userId = userCredential.user.uid;
 
-      // 2. Wrap Firestore calls in try/catch to handle specific permission/confirmations
       try {
         const newUserObj = {
           username: userData.username || '',
@@ -261,15 +253,11 @@ const App: React.FC = () => {
             staff: [],
             location: shopData.location || null
           };
-          // Wait for confirmation
           const shopDocRef = await addDoc(collection(db, 'shops'), newShopRecord);
           newUserObj.shopId = shopDocRef.id;
         }
 
-        // Wait for profile confirmation
         await setDoc(doc(db, 'users', userId), newUserObj);
-        
-        // Success: Remember the phone
         if (userData.phone) {
           localStorage.setItem('rememberedPhone', userData.phone);
         }
@@ -312,7 +300,6 @@ const App: React.FC = () => {
         location: shopData.location || null
       };
       
-      // Explicitly wait for database success
       const docRef = await addDoc(collection(db, 'shops'), newShopRecord);
       const shopId = docRef.id;
       
@@ -331,13 +318,22 @@ const App: React.FC = () => {
     try {
       const shopRef = doc(db, 'shops', shopId);
       await updateDoc(shopRef, updates);
+      
       if (updates.isOpen !== undefined) {
-         await addDoc(collection(db, 'history'), {
-          username: isAutoToggle ? 'System Auto-Mode' : (state.currentUser?.username || 'Unknown'),
-          action: updates.isOpen ? 'Opened Facility' : 'Closed Facility',
+        const username = isAutoToggle ? 'System Auto-Mode' : (state.currentUser?.username || 'Unknown');
+        // Construct history data matching the HistoryItem interface used in components
+        const historyEntry = {
+          changedBy: username,
+          status: updates.isOpen ? 'Open' : 'Closed',
           timestamp: Date.now(),
-          shopId
-        });
+          shopId: shopId,
+          username: username,
+          action: updates.isOpen ? 'Facility Opened' : 'Facility Closed'
+        };
+        
+        // Save to sub-collection for shop-specific logs and root collection for global admin logs
+        await addDoc(collection(db, 'shops', shopId, 'history'), historyEntry);
+        await addDoc(collection(db, 'history'), historyEntry);
       }
     } catch (error: any) {
       console.error("Firestore Update Error:", error);
@@ -389,12 +385,13 @@ const App: React.FC = () => {
   const clearHistory = async () => {
     if (!state.currentUser?.shopId) return;
     try {
-      const q = query(collection(db, 'history'));
+      const q = query(collection(db, 'shops', state.currentUser.shopId, 'history'));
       const snapshot = await getDocs(q);
-      const deletePromises = snapshot.docs
-        .filter(d => d.data().shopId === state.currentUser?.shopId)
-        .map(d => deleteDoc(doc(db, 'history', d.id)));
-      await Promise.all(deletePromises);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((d) => {
+        batch.delete(d.ref);
+      });
+      await batch.commit();
     } catch (error: any) {
       alert(`Clear Error: ${error.message}`);
     }
