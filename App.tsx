@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc, where, orderBy, limit, writeBatch } from 'firebase/firestore';
@@ -102,7 +101,6 @@ const App: React.FC = () => {
       setState(prev => ({ ...prev, comments: fetchedComments }));
     });
 
-    // Add a listener for the global history collection to populate Admin dashboard and User feeds
     const unsubHistory = onSnapshot(collection(db, 'history'), (snapshot) => {
       const fetchedHistory = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HistoryItem));
       setState(prev => ({ ...prev, history: fetchedHistory }));
@@ -163,6 +161,7 @@ const App: React.FC = () => {
       setLoading(true);
       
       if (isStaff && shopCode) {
+        // Staff Login: Find shop by unique code first
         const shopsRef = collection(db, 'shops');
         const q = query(shopsRef, where("code", "==", shopCode));
         const querySnapshot = await getDocs(q);
@@ -174,6 +173,7 @@ const App: React.FC = () => {
 
         const shopDoc = querySnapshot.docs[0];
         const shopData = shopDoc.data() as Shop;
+        // Verify staff exists within the shop's personnel array
         const staffMember = (shopData.staff || []).find(s => s.username === identifier && s.password === pass);
 
         if (staffMember) {
@@ -321,7 +321,6 @@ const App: React.FC = () => {
       
       if (updates.isOpen !== undefined) {
         const username = isAutoToggle ? 'System Auto-Mode' : (state.currentUser?.username || 'Unknown');
-        // Construct history data matching the HistoryItem interface used in components
         const historyEntry = {
           changedBy: username,
           status: updates.isOpen ? 'Open' : 'Closed',
@@ -331,7 +330,7 @@ const App: React.FC = () => {
           action: updates.isOpen ? 'Facility Opened' : 'Facility Closed'
         };
         
-        // Save to sub-collection for shop-specific logs and root collection for global admin logs
+        // Save to specific sub-collection for the shop and root collection for admin visibility
         await addDoc(collection(db, 'shops', shopId, 'history'), historyEntry);
         await addDoc(collection(db, 'history'), historyEntry);
       }
