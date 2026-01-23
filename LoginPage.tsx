@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User as UserIcon, Lock, Store, ArrowRight, Eye, EyeOff, UserCheck, ShieldAlert } from 'lucide-react';
@@ -13,24 +14,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [isStaff, setIsStaff] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [lastUser, setLastUser] = useState<any>(null);
-  const [isQuickLogin, setIsQuickLogin] = useState(false);
+  const [rememberedPhone, setRememberedPhone] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('shopfinder_last_user_v1');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setLastUser(parsed);
-        setIdentifier(parsed.phone || parsed.username || '');
-        setIsStaff(parsed.isStaff || false);
-        if (parsed.shopCode) setShopCode(parsed.shopCode);
-        setIsQuickLogin(true);
-      }
-    } catch(e) {}
+    const saved = localStorage.getItem('rememberedPhone');
+    if (saved) {
+      setRememberedPhone(saved);
+      setIdentifier(saved);
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,7 +41,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   };
 
   const handleSwitchAccount = () => {
-    setIsQuickLogin(false);
+    localStorage.removeItem('rememberedPhone');
+    setRememberedPhone(null);
     setIdentifier('');
     setPassword('');
     setShopCode('');
@@ -66,16 +61,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <p className="text-slate-400 font-bold mt-3 text-xs tracking-widest uppercase">Find anything, anywhere</p>
         </div>
 
-        {isQuickLogin && lastUser && !isLoading && (
+        {rememberedPhone && !isStaff && !isLoading && (
           <div className="mb-8 p-5 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col items-center text-center animate-in slide-in-from-top-2">
             <div className="p-3 bg-blue-600 text-white rounded-xl mb-3 shadow-lg">
               <UserCheck className="h-6 w-6" />
             </div>
             <div>
               <p className="text-base font-black text-[#0f172a]">
-                Welcome back, <span className="text-blue-600">{lastUser.username}</span>
+                Welcome back, <span className="text-blue-600">{rememberedPhone}</span>
               </p>
-              {lastUser.shopCode && <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">CODE: {lastUser.shopCode}</p>}
             </div>
             <button 
                 type="button"
@@ -94,7 +88,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {!isQuickLogin && (
+          {(!rememberedPhone || isStaff) && (
             <>
               <div className="flex items-center gap-3 mb-2 p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus-within:border-blue-100 transition-all cursor-pointer" onClick={() => setIsStaff(!isStaff)}>
                 <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isStaff ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
@@ -173,12 +167,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             disabled={isLoading}
             className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 flex items-center justify-center gap-3 group uppercase tracking-widest text-sm disabled:opacity-50"
           >
-            {isLoading ? 'Authenticating...' : (isQuickLogin ? 'Sign In' : 'Enter Shop Finder')} 
+            {isLoading ? 'Authenticating...' : (rememberedPhone && !isStaff ? 'Sign In' : 'Enter Shop Finder')} 
             {!isLoading && <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />}
           </button>
         </form>
 
-        {!isQuickLogin && !isLoading && (
+        {(!rememberedPhone || isStaff) && !isLoading && (
           <div className="mt-10 pt-8 border-t border-slate-100 text-center">
             <p className="text-slate-400 font-bold text-sm">
               New to Shop Finder?{' '}
