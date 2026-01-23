@@ -15,7 +15,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    username: '', phone: '', email: '', password: '', confirmPassword: '',
+    username: '', phone: '', password: '', confirmPassword: '',
     shopName: '', shopType: '', otherCategory: '', state: '', lga: '', address: '',
     lat: null as number | null, lng: null as number | null
   });
@@ -54,6 +54,11 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
       return;
     }
     
+    if (formData.password.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords do not match.");
       return;
@@ -87,7 +92,6 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
     const user = { 
       username: formData.username, 
       phone: formData.phone, 
-      email: formData.email,
       password: formData.password 
     };
 
@@ -125,9 +129,8 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignup }) => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Username *" icon={UserIcon} value={formData.username} onChange={v => setFormData({ ...formData, username: v })} />
-                <Input label="phone number *" icon={Phone} value={formData.phone} onChange={v => setFormData({ ...formData, phone: v })} />
+                <Input label="Phone Number *" icon={Phone} value={formData.phone} onChange={v => setFormData({ ...formData, phone: v })} />
               </div>
-              <Input label="Email (Optional)" icon={Mail} value={formData.email} onChange={v => setFormData({ ...formData, email: v })} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 relative">
                   <Input 
