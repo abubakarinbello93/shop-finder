@@ -1,3 +1,4 @@
+
 export type BusinessDay = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export interface BusinessHour {
@@ -24,10 +25,13 @@ export interface Staff {
 
 export interface HistoryItem {
   id: string;
-  username: string;
-  action: string; 
+  changedBy: string;
+  status: 'Open' | 'Closed'; 
   timestamp: number;
+  // Fields used by various components to support both shop-specific and global history views
   shopId: string;
+  action: string;
+  username: string;
 }
 
 export interface Comment {
