@@ -18,8 +18,9 @@ import AdminDashboard from './AdminDashboard';
 
 // Helper to handle identifier to email mapping for Firebase Auth
 const identifierToEmail = (id: string) => {
-  if (id.includes('@')) return id;
-  return `${id.replace(/\s+/g, '').toLowerCase()}@openshop.app`;
+  const cleaned = id.replace(/\s+/g, '').trim().toLowerCase();
+  if (cleaned.includes('@')) return cleaned;
+  return `${cleaned}@shop.com`;
 };
 
 const generateShopCode = (name: string): string => {
@@ -163,8 +164,13 @@ const App: React.FC = () => {
 
   const registerUser = async (userData: Partial<User>, shopData?: Partial<Shop>): Promise<{ success: boolean; message?: string }> => {
     try {
+      if (userData.password && userData.password.length < 6) {
+        return { success: false, message: "Password must be at least 6 characters long." };
+      }
+
       setLoading(true);
-      const email = userData.email || identifierToEmail(userData.username!);
+      const loginIdentifier = userData.phone || userData.username!;
+      const email = identifierToEmail(loginIdentifier);
       
       // 1. Create Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, email, userData.password!);
@@ -211,6 +217,9 @@ const App: React.FC = () => {
     } catch (error: any) {
       console.error("Registration Error:", error);
       setLoading(false);
+      if (error.code === 'auth/email-already-in-use') {
+        return { success: false, message: 'This phone number is already registered.' };
+      }
       return { success: false, message: error.message };
     }
   };
