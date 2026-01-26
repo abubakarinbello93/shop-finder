@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Phone, Mail, MapPin, Clock, CheckCircle, Package, Info, Heart, Search, MessageSquare, Send, Plus, Bell, Hourglass } from 'lucide-react';
-import { Shop, Comment, ServiceItem } from './types';
+import { X, Phone, Mail, MapPin, Clock, CheckCircle, Package, Info, Heart, Search, MessageSquare, Send, Plus, Bell, Timer } from 'lucide-react';
+import { Shop, Comment } from './types';
 
 interface ShopDetailModalProps {
   shop: Shop;
@@ -15,6 +15,12 @@ interface ShopDetailModalProps {
 const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onClose, onToggleFavorite, comments = [], onAddComment }) => {
   const [activeTab, setActiveTab] = useState<'available' | 'services' | 'details' | 'comments'>('details');
   const [itemSearch, setItemSearch] = useState('');
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 10000); // Update every 10s for customer view
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredItems = useMemo(() => {
     const term = itemSearch.toLowerCase().trim();
@@ -23,12 +29,24 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
   }, [shop.items, itemSearch]);
 
   const availableFiltered = useMemo(() => {
-    return filteredItems.filter(i => i.available);
-  }, [filteredItems]);
+    // Treat as available if time has passed
+    return filteredItems.filter(i => i.available || (i.restockDate && i.restockDate <= now));
+  }, [filteredItems, now]);
 
   const shopComments = useMemo(() => {
     return comments.filter(c => c.shopId === shop.id).sort((a, b) => b.timestamp - a.timestamp);
   }, [comments, shop.id]);
+
+  const formatCountdown = (target: number) => {
+    const diff = target - now;
+    if (diff <= 0) return "Arriving now!";
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (days > 0) return `Available in: ${days}d, ${hours}h`;
+    return `Available in: ${hours}h, ${mins}m`;
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -144,7 +162,20 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Complete Catalog</h3>
               {filteredItems.length > 0 ? (
                 filteredItems.map(item => (
-                  <CatalogItemRow key={item.id} item={item} />
+                  <div key={item.id} className="flex flex-col gap-2 p-4 rounded-xl border bg-white shadow-sm hover:border-blue-200 transition-colors animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-gray-700 uppercase tracking-tight">{item.name}</span>
+                      <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${item.available || (item.restockDate && item.restockDate <= now) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {item.available || (item.restockDate && item.restockDate <= now) ? 'Available' : 'Out of stock'}
+                      </span>
+                    </div>
+                    {!item.available && item.restockDate && item.restockDate > now && (
+                      <div className="flex items-center gap-2 text-indigo-600 font-black text-[9px] uppercase tracking-widest bg-indigo-50 w-fit px-3 py-1 rounded-lg">
+                        <Timer className="h-3 w-3 animate-pulse" />
+                        {formatCountdown(item.restockDate)}
+                      </div>
+                    )}
+                  </div>
                 ))
               ) : (
                 <div className="text-center py-12 px-6">
@@ -228,55 +259,6 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
           </button>
         </div>
       </div>
-    </div>
-  );
-};
-
-const CatalogItemRow: React.FC<{ item: ServiceItem }> = ({ item }) => {
-  const [countdownStr, setCountdownStr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!item.restockDate) {
-      setCountdownStr(null);
-      return;
-    }
-
-    const update = () => {
-      const diff = item.restockDate! - Date.now();
-      if (diff <= 0) {
-        setCountdownStr(null);
-        return;
-      }
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      
-      const parts = [];
-      if (days > 0) parts.push(`${days} Days`);
-      if (hours > 0) parts.push(`${hours} Hours`);
-      if (days === 0 && hours === 0) parts.push(`${mins} Mins`);
-      
-      setCountdownStr(parts.join(', '));
-    };
-
-    update();
-    const interval = setInterval(update, 30000);
-    return () => clearInterval(interval);
-  }, [item.restockDate]);
-
-  return (
-    <div className="flex flex-col p-4 rounded-xl border bg-white shadow-sm hover:border-blue-200 transition-all animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex justify-between items-center">
-        <span className="font-bold text-gray-700">{item.name}</span>
-        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${item.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-          {item.available ? 'Available' : 'Out of stock'}
-        </span>
-      </div>
-      {countdownStr && (
-        <div className="mt-2 flex items-center gap-1.5 text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full w-fit border border-indigo-100">
-          <Hourglass className="h-2.5 w-2.5" /> Available in: {countdownStr}
-        </div>
-      )}
     </div>
   );
 };
