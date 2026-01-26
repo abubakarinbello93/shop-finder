@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, X, Save, Check, Package, Clock, ArrowLeft, Search, Lock, Calendar, Hourglass } from 'lucide-react';
@@ -61,13 +62,13 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
       // Opening modal for marking as Out of Stock
       setRestockModalItem(item);
     } else {
-      // Marking as Available (Manual Override)
+      // Manual Override: Cancel timer and make available immediately
       handleUpdateItem(item.id, { available: true, restockDate: undefined });
     }
   };
 
   return (
-    <Layout user={currentUser!} shop={userShop} onLogout={onLogout}>
+    <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
       <div className="mb-10">
         <button 
           onClick={() => navigate('/dashboard')}
@@ -175,33 +176,34 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
 };
 
 const InventoryCard: React.FC<{ item: ServiceItem, onToggle: () => void, onDelete: () => void }> = ({ item, onToggle, onDelete }) => {
-  const [countdown, setCountdown] = useState<string | null>(null);
+  const [countdownStr, setCountdownStr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!item.restockDate) {
-      setCountdown(null);
+      setCountdownStr(null);
       return;
     }
 
     const update = () => {
       const diff = item.restockDate! - Date.now();
       if (diff <= 0) {
-        setCountdown(null);
+        setCountdownStr(null);
         return;
       }
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       
-      let str = "";
-      if (days > 0) str += `${days}d `;
-      if (hours > 0) str += `${hours}h `;
-      str += `${mins}m`;
-      setCountdown(str);
+      const parts = [];
+      if (days > 0) parts.push(`${days} Days`);
+      if (hours > 0) parts.push(`${hours} Hours`);
+      if (days === 0 && hours === 0) parts.push(`${mins} Mins`);
+      
+      setCountdownStr(parts.join(', '));
     };
 
     update();
-    const interval = setInterval(update, 60000);
+    const interval = setInterval(update, 30000);
     return () => clearInterval(interval);
   }, [item.restockDate]);
 
@@ -211,17 +213,17 @@ const InventoryCard: React.FC<{ item: ServiceItem, onToggle: () => void, onDelet
         <div className={`p-4 rounded-2xl shadow-sm transition-colors ${item.available ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
           <Package className="h-7 w-7" />
         </div>
-        <div>
-          <h4 className="font-black text-gray-900 text-lg uppercase tracking-tight">{item.name}</h4>
+        <div className="min-w-0 flex-1">
+          <h4 className="font-black text-gray-900 text-lg uppercase tracking-tight truncate">{item.name}</h4>
           <div className="flex items-center gap-2 mt-1">
             {item.time && <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.time}</div>}
             {!item.available && (
               <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase border border-red-100">Out of Stock</span>
             )}
           </div>
-          {countdown && (
+          {countdownStr && (
             <div className="flex items-center gap-1.5 mt-2 text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full w-fit border border-indigo-100 animate-pulse">
-              <Hourglass className="h-3 w-3" /> Available in: {countdown}
+              <Hourglass className="h-3 w-3" /> Available in: {countdownStr}
             </div>
           )}
         </div>
@@ -229,7 +231,7 @@ const InventoryCard: React.FC<{ item: ServiceItem, onToggle: () => void, onDelet
       <div className="flex items-center gap-4 border-t md:border-t-0 pt-4 md:pt-0">
         <button 
           onClick={onToggle}
-          className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${item.available ? 'bg-green-600 text-white hover:bg-red-600' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+          className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${item.available ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-green-600 text-white hover:bg-green-700'}`}
         >
           {item.available ? 'Mark Out of Stock' : (item.restockDate ? 'Available Now' : 'Mark Available')}
         </button>
@@ -262,10 +264,10 @@ const RestockModal: React.FC<{ item: ServiceItem, onClose: () => void, onSave: (
       <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">Restock Logic</h2>
+            <h2 className="text-2xl font-black text-[#0f172a] tracking-tighter uppercase leading-none">Smart Out of Stock</h2>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{item.name}</p>
           </div>
-          <button onClick={onClose} className="p-3 bg-white border border-slate-200 rounded-2xl hover:text-red-500"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="p-3 bg-white border border-slate-200 rounded-2xl hover:text-red-500 hover:bg-red-50 transition-all"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="p-10">
@@ -279,7 +281,7 @@ const RestockModal: React.FC<{ item: ServiceItem, onClose: () => void, onSave: (
               </button>
               <button 
                 onClick={onNoTimer}
-                className="w-full p-6 bg-slate-50 text-slate-500 border-2 border-slate-100 rounded-3xl font-black text-lg flex items-center justify-center gap-4 hover:bg-slate-100 transition-all uppercase tracking-tighter"
+                className="w-full p-6 bg-slate-100 text-slate-500 border-2 border-transparent rounded-3xl font-black text-lg flex items-center justify-center gap-4 hover:bg-slate-200 hover:text-slate-700 transition-all uppercase tracking-tighter"
               >
                 <X className="h-6 w-6" /> No Timer
               </button>
@@ -287,7 +289,7 @@ const RestockModal: React.FC<{ item: ServiceItem, onClose: () => void, onSave: (
           ) : (
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Restock Date</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Expected Date</label>
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-base outline-none focus:border-blue-600 transition-all" />
               </div>
               <div className="grid grid-cols-2 gap-4">
