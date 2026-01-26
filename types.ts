@@ -14,7 +14,7 @@ export interface ServiceItem {
   name: string;
   time?: string;
   available: boolean;
-  restockDate?: number; // Timestamp for smart out-of-stock
+  restockDate?: number; // Timestamp for when the item becomes available again
 }
 
 export interface Staff {
