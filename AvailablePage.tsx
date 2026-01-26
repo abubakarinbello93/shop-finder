@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, CheckCircle, Package, Store, ArrowLeft, Navigation, MapPin, Filter, X } from 'lucide-react';
+import { Search, CheckCircle, Package, ArrowLeft, Navigation, MapPin, X, Timer } from 'lucide-react';
 import Layout from './Layout';
 import { AppState, Shop } from './types';
 import ShopDetailModal from './ShopDetailModal';
@@ -31,9 +32,15 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const navigate = useNavigate();
   const { currentUser, shops } = state;
   const userShop = shops.find(s => s.id === currentUser?.shopId);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleCaptureLocation = () => {
     if (isCapturing) return;
@@ -63,11 +70,14 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
     shops.forEach(s => {
       if (!s.isOpen) return;
       
-      // Category filter
       if (selectedCategory && s.type !== selectedCategory) return;
 
       (s.items || []).forEach(item => {
-        if (item.available && (item.name.toLowerCase().includes(term) || s.name.toLowerCase().includes(term))) {
+        // Show if available OR if it has a restock timer set
+        const isActuallyAvailable = item.available || (item.restockDate && item.restockDate <= now);
+        const hasRestockTimer = item.restockDate && item.restockDate > now;
+
+        if ((isActuallyAvailable || hasRestockTimer) && (item.name.toLowerCase().includes(term) || s.name.toLowerCase().includes(term))) {
           let dist = null;
           if (userLocation && s.location && s.locationVisible) {
             dist = getDistance(userLocation.lat, userLocation.lng, s.location.lat, s.location.lng);
@@ -86,7 +96,17 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
     }
 
     return list;
-  }, [shops, searchTerm, userLocation, selectedCategory]);
+  }, [shops, searchTerm, userLocation, selectedCategory, now]);
+
+  const formatCountdown = (target: number) => {
+    const diff = target - now;
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days > 0) return `${days}d, ${hours}h`;
+    return `${hours}h, ${mins}m`;
+  };
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
@@ -160,43 +180,53 @@ const AvailablePage: React.FC<AvailablePageProps> = ({ state, onLogout, onToggle
 
       {discoverList.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-          {discoverList.map((res, idx) => (
-            <div 
-              key={idx}
-              onClick={() => setSelectedShop(res.shop)}
-              className="group bg-white p-3 md:p-6 rounded-[24px] md:rounded-3xl shadow-sm border-2 border-transparent hover:border-blue-100 hover:shadow-xl transition-all flex flex-col cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300"
-            >
-              <div className="flex items-start gap-2 md:gap-4 mb-3 md:mb-4">
-                <div className="p-2 md:p-3 bg-green-50 text-green-600 rounded-xl md:rounded-2xl shrink-0">
-                  <CheckCircle className="h-4 w-4 md:h-6 md:w-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col gap-0.5">
-                    <h4 className="font-black text-gray-900 text-xs md:text-lg leading-tight uppercase tracking-tight truncate">{res.item.name}</h4>
-                    <div className="flex items-center flex-wrap gap-1">
-                      {res.distance !== null && (
-                        <span className="text-[7px] md:text-[8px] w-fit font-black bg-blue-700 text-white px-1.5 md:py-0.5 rounded-full uppercase tracking-tighter">
-                          {res.distance.toFixed(1)} KM
-                        </span>
-                      )}
-                      <span className="text-[7px] md:text-[8px] font-black text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
-                        {res.shop.type}
-                      </span>
-                    </div>
+          {discoverList.map((res, idx) => {
+             const isComingSoon = !res.item.available && res.item.restockDate && res.item.restockDate > now;
+             return (
+              <div 
+                key={idx}
+                onClick={() => setSelectedShop(res.shop)}
+                className={`group p-3 md:p-6 rounded-[24px] md:rounded-3xl shadow-sm border-2 transition-all flex flex-col cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-300 ${isComingSoon ? 'bg-slate-50 border-indigo-100' : 'bg-white border-transparent hover:border-blue-100 hover:shadow-xl'}`}
+              >
+                <div className="flex items-start gap-2 md:gap-4 mb-3 md:mb-4">
+                  <div className={`p-2 md:p-3 rounded-xl md:rounded-2xl shrink-0 ${isComingSoon ? 'bg-indigo-100 text-indigo-600' : 'bg-green-50 text-green-600'}`}>
+                    {isComingSoon ? <Timer className="h-4 w-4 md:h-6 md:w-6" /> : <CheckCircle className="h-4 w-4 md:h-6 md:w-6" />}
                   </div>
-                  <p className="text-[8px] md:text-[10px] font-black text-blue-700 uppercase tracking-widest mt-1 italic truncate">{res.shop.name}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col gap-0.5">
+                      <h4 className="font-black text-gray-900 text-xs md:text-lg leading-tight uppercase tracking-tight truncate">{res.item.name}</h4>
+                      <div className="flex items-center flex-wrap gap-1">
+                        {res.distance !== null && (
+                          <span className="text-[7px] md:text-[8px] w-fit font-black bg-blue-700 text-white px-1.5 md:py-0.5 rounded-full uppercase tracking-tighter">
+                            {res.distance.toFixed(1)} KM
+                          </span>
+                        )}
+                        <span className="text-[7px] md:text-[8px] font-black text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
+                          {res.shop.type}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[8px] md:text-[10px] font-black text-blue-700 uppercase tracking-widest mt-1 italic truncate">{res.shop.name}</p>
+                  </div>
+                </div>
+                
+                {isComingSoon && (
+                  <div className="mb-3 p-2 bg-indigo-600 text-white rounded-xl text-[7px] md:text-[10px] font-black uppercase tracking-widest text-center flex items-center justify-center gap-2">
+                    <Timer className="h-3 w-3" /> Available in: {formatCountdown(res.item.restockDate)}
+                  </div>
+                )}
+
+                <div className="mt-auto pt-2 md:pt-4 border-t border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
+                  <div className="flex items-center gap-1 text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest truncate max-w-full">
+                    <MapPin className="h-2 w-2 md:h-3 md:w-3 shrink-0" /> {res.shop.lga}
+                  </div>
+                  <div className={`text-[7px] md:text-[10px] font-black uppercase tracking-widest ${isComingSoon ? 'text-indigo-600' : 'text-green-600'}`}>
+                    {isComingSoon ? 'Coming Soon' : (res.item.time || 'NOW')}
+                  </div>
                 </div>
               </div>
-              <div className="mt-auto pt-2 md:pt-4 border-t border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-1">
-                <div className="flex items-center gap-1 text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest truncate max-w-full">
-                  <MapPin className="h-2 w-2 md:h-3 md:w-3 shrink-0" /> {res.shop.lga}
-                </div>
-                <div className="text-[7px] md:text-[10px] font-black text-green-600 uppercase tracking-widest">
-                  {res.item.time || 'NOW'}
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="bg-white p-10 md:p-20 rounded-[40px] text-center border-2 border-dashed border-gray-100 animate-in zoom-in-95 duration-500">
