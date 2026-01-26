@@ -233,33 +233,34 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
 };
 
 const CatalogItemRow: React.FC<{ item: ServiceItem }> = ({ item }) => {
-  const [countdown, setCountdown] = useState<string | null>(null);
+  const [countdownStr, setCountdownStr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!item.restockDate) {
-      setCountdown(null);
+      setCountdownStr(null);
       return;
     }
 
     const update = () => {
       const diff = item.restockDate! - Date.now();
       if (diff <= 0) {
-        setCountdown(null);
+        setCountdownStr(null);
         return;
       }
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       
-      let str = "";
-      if (days > 0) str += `${days}d `;
-      if (hours > 0) str += `${hours}h `;
-      str += `${mins}m`;
-      setCountdown(str);
+      const parts = [];
+      if (days > 0) parts.push(`${days} Days`);
+      if (hours > 0) parts.push(`${hours} Hours`);
+      if (days === 0 && hours === 0) parts.push(`${mins} Mins`);
+      
+      setCountdownStr(parts.join(', '));
     };
 
     update();
-    const interval = setInterval(update, 60000);
+    const interval = setInterval(update, 30000);
     return () => clearInterval(interval);
   }, [item.restockDate]);
 
@@ -271,9 +272,9 @@ const CatalogItemRow: React.FC<{ item: ServiceItem }> = ({ item }) => {
           {item.available ? 'Available' : 'Out of stock'}
         </span>
       </div>
-      {countdown && (
+      {countdownStr && (
         <div className="mt-2 flex items-center gap-1.5 text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full w-fit border border-indigo-100">
-          <Hourglass className="h-2.5 w-2.5" /> Back in: {countdown}
+          <Hourglass className="h-2.5 w-2.5" /> Available in: {countdownStr}
         </div>
       )}
     </div>
