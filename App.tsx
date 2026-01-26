@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc, where, orderBy, limit, writeBatch } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { User, Shop, AppState, HistoryItem, Comment, BusinessHour } from './types';
+import { User, Shop, AppState, HistoryItem, Comment, BusinessHour, ServiceItem } from './types';
 import { MOCK_SHOPS } from './constants';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
@@ -41,6 +42,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const lastCheckedTime = useRef<string>('');
+  const lastRestockCheck = useRef<number>(0);
 
   // 1. AUTH STATE OBSERVER
   useEffect(() => {
@@ -114,9 +116,9 @@ const App: React.FC = () => {
     };
   }, [state.currentUser?.id]);
 
-  // 3. AUTOMATIC MODE TIMER
+  // 3. AUTOMATIC MODE TIMER & SMART RESTOCK CHECKER
   useEffect(() => {
-    const checkSchedules = async () => {
+    const runSystemChecks = async () => {
       if (state.shops.length === 0) return;
 
       const now = new Date();
@@ -133,26 +135,44 @@ const App: React.FC = () => {
       const hourStr = parts.find(p => p.type === 'hour')?.value || '00';
       const minStr = parts.find(p => p.type === 'minute')?.value || '00';
       const currentTime = `${hourStr}:${minStr}`;
+      const currentTimestamp = Date.now();
 
-      if (currentTime === lastCheckedTime.current) return;
-      lastCheckedTime.current = currentTime;
+      // a. Check Business Hours (runs once per minute)
+      if (currentTime !== lastCheckedTime.current) {
+        lastCheckedTime.current = currentTime;
+        for (const shop of state.shops) {
+          if (!shop.isAutomatic) continue;
+          const schedule = (shop.businessHours || []).find(bh => bh.day === currentDay && bh.enabled);
+          if (!schedule) continue;
+          if (currentTime === schedule.open && !shop.isOpen) {
+            await updateShop(shop.id, { isOpen: true }, true);
+          } else if (currentTime === schedule.close && shop.isOpen) {
+            await updateShop(shop.id, { isOpen: false }, true);
+          }
+        }
+      }
 
-      for (const shop of state.shops) {
-        if (!shop.isAutomatic) continue;
-
-        const schedule = (shop.businessHours || []).find(bh => bh.day === currentDay && bh.enabled);
-        if (!schedule) continue;
-
-        if (currentTime === schedule.open && !shop.isOpen) {
-          await updateShop(shop.id, { isOpen: true }, true);
-        } else if (currentTime === schedule.close && shop.isOpen) {
-          await updateShop(shop.id, { isOpen: false }, true);
+      // b. Check Smart Restock (runs every 30 seconds)
+      if (currentTimestamp - lastRestockCheck.current > 30000) {
+        lastRestockCheck.current = currentTimestamp;
+        for (const shop of state.shops) {
+          let needsUpdate = false;
+          const updatedItems = (shop.items || []).map(item => {
+            if (item.restockDate && currentTimestamp >= item.restockDate) {
+              needsUpdate = true;
+              return { ...item, available: true, restockDate: undefined };
+            }
+            return item;
+          });
+          if (needsUpdate) {
+            await updateShop(shop.id, { items: updatedItems });
+          }
         }
       }
     };
 
-    const intervalId = setInterval(checkSchedules, 60000);
-    checkSchedules();
+    const intervalId = setInterval(runSystemChecks, 30000);
+    runSystemChecks();
     return () => clearInterval(intervalId);
   }, [state.shops]);
 
@@ -161,7 +181,6 @@ const App: React.FC = () => {
       setLoading(true);
       
       if (isStaff && shopCode) {
-        // Staff Login: Find shop by unique code first
         const shopsRef = collection(db, 'shops');
         const q = query(shopsRef, where("code", "==", shopCode));
         const querySnapshot = await getDocs(q);
@@ -173,7 +192,6 @@ const App: React.FC = () => {
 
         const shopDoc = querySnapshot.docs[0];
         const shopData = shopDoc.data() as Shop;
-        // Verify staff exists within the shop's personnel array
         const staffMember = (shopData.staff || []).find(s => s.username === identifier && s.password === pass);
 
         if (staffMember) {
@@ -330,7 +348,6 @@ const App: React.FC = () => {
           action: updates.isOpen ? 'Facility Opened' : 'Facility Closed'
         };
         
-        // Save to specific sub-collection for the shop and root collection for admin visibility
         await addDoc(collection(db, 'shops', shopId, 'history'), historyEntry);
         await addDoc(collection(db, 'history'), historyEntry);
       }
