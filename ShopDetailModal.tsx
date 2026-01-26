@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { X, Phone, Mail, MapPin, Clock, CheckCircle, Package, Info, Heart, Search, MessageSquare, Send, Plus, Bell } from 'lucide-react';
-import { Shop, Comment } from './types';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, Phone, Mail, MapPin, Clock, CheckCircle, Package, Info, Heart, Search, MessageSquare, Send, Plus, Bell, Hourglass } from 'lucide-react';
+import { Shop, Comment, ServiceItem } from './types';
 
 interface ShopDetailModalProps {
   shop: Shop;
@@ -143,12 +144,7 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Complete Catalog</h3>
               {filteredItems.length > 0 ? (
                 filteredItems.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-4 rounded-xl border bg-white shadow-sm hover:border-blue-200 transition-colors animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <span className="font-bold text-gray-700">{item.name}</span>
-                    <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${item.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {item.available ? 'Available' : 'Out of stock'}
-                    </span>
-                  </div>
+                  <CatalogItemRow key={item.id} item={item} />
                 ))
               ) : (
                 <div className="text-center py-12 px-6">
@@ -232,6 +228,54 @@ const ShopDetailModal: React.FC<ShopDetailModalProps> = ({ shop, isFavorite, onC
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+const CatalogItemRow: React.FC<{ item: ServiceItem }> = ({ item }) => {
+  const [countdown, setCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!item.restockDate) {
+      setCountdown(null);
+      return;
+    }
+
+    const update = () => {
+      const diff = item.restockDate! - Date.now();
+      if (diff <= 0) {
+        setCountdown(null);
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      let str = "";
+      if (days > 0) str += `${days}d `;
+      if (hours > 0) str += `${hours}h `;
+      str += `${mins}m`;
+      setCountdown(str);
+    };
+
+    update();
+    const interval = setInterval(update, 60000);
+    return () => clearInterval(interval);
+  }, [item.restockDate]);
+
+  return (
+    <div className="flex flex-col p-4 rounded-xl border bg-white shadow-sm hover:border-blue-200 transition-all animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex justify-between items-center">
+        <span className="font-bold text-gray-700">{item.name}</span>
+        <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${item.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          {item.available ? 'Available' : 'Out of stock'}
+        </span>
+      </div>
+      {countdown && (
+        <div className="mt-2 flex items-center gap-1.5 text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full w-fit border border-indigo-100">
+          <Hourglass className="h-2.5 w-2.5" /> Back in: {countdown}
+        </div>
+      )}
     </div>
   );
 };
