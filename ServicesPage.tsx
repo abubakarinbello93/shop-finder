@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Package, Search, Lock, ArrowLeft, Clock, Calendar, X, Check, Timer } from 'lucide-react';
@@ -33,7 +32,7 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
 
   // Auto-Update Logic: Check if any items should be restocked automatically
   useEffect(() => {
-    if (!userShop) return;
+    if (!userShop || !userShop.items) return;
     const itemsToUpdate = userShop.items.filter(item => 
       !item.available && item.restockDate && item.restockDate <= Date.now()
     );
@@ -41,7 +40,8 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
     if (itemsToUpdate.length > 0) {
       const updatedItems = userShop.items.map(item => {
         if (!item.available && item.restockDate && item.restockDate <= Date.now()) {
-          return { ...item, available: true, restockDate: undefined };
+          const { restockDate, ...rest } = item;
+          return { ...rest, available: true };
         }
         return item;
       });
@@ -80,11 +80,16 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
       // Show Restock Modal when moving from In Stock to Out of Stock
       setTimerModalItem(item);
     } else {
-      // Manual Override: Set back to In Stock
-      const items = userShop.items.map(i => 
-        i.id === item.id ? { ...i, available: true, restockDate: undefined } : i
-      );
-      onUpdateShop(userShop.id, { items });
+      // MANUAL OVERRIDE: Set back to In Stock immediately
+      const updatedItems = userShop.items.map(i => {
+        if (i.id === item.id) {
+          // Remove restockDate completely and set available to true
+          const { restockDate, ...rest } = i;
+          return { ...rest, available: true };
+        }
+        return i;
+      });
+      onUpdateShop(userShop.id, { items: updatedItems });
     }
   };
 
@@ -98,23 +103,30 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
       return;
     }
 
-    const items = userShop.items.map(i => 
+    const updatedItems = userShop.items.map(i => 
       i.id === timerModalItem.id ? { ...i, available: false, restockDate: restockTimestamp } : i
     );
-    onUpdateShop(userShop.id, { items });
+    onUpdateShop(userShop.id, { items: updatedItems });
     setTimerModalItem(null);
+    setRestockDetails({ date: '', hour: '00', minute: '00' });
   };
 
   const saveNoTimer = () => {
     if (!timerModalItem) return;
-    const items = userShop.items.map(i => 
-      i.id === timerModalItem.id ? { ...i, available: false, restockDate: undefined } : i
-    );
-    onUpdateShop(userShop.id, { items });
+    const updatedItems = userShop.items.map(i => {
+      if (i.id === timerModalItem.id) {
+        // Remove restockDate completely
+        const { restockDate, ...rest } = i;
+        return { ...rest, available: false };
+      }
+      return i;
+    });
+    onUpdateShop(userShop.id, { items: updatedItems });
     setTimerModalItem(null);
   };
 
   const handleDelete = (id: string) => {
+    if (!window.confirm("Delete this item from your catalog?")) return;
     const items = userShop.items.filter(item => item.id !== id);
     onUpdateShop(userShop.id, { items });
   };
@@ -239,6 +251,12 @@ const ServicesPage: React.FC<ServicesPageProps> = ({ state, onLogout, onUpdateSh
             </div>
           </div>
         ))}
+        {filteredItems.length === 0 && (
+          <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100">
+             <Package className="h-12 w-12 text-slate-200 mx-auto mb-4" />
+             <p className="font-black text-slate-400 uppercase tracking-widest">No items found</p>
+          </div>
+        )}
       </div>
 
       {/* Restock Timer Modal */}
