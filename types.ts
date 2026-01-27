@@ -1,3 +1,4 @@
+
 export type BusinessDay = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export interface BusinessHour {
@@ -27,6 +28,7 @@ export interface Shift {
 export interface Staff {
   id: string;
   username: string;
+  fullName: string;
   password?: string;
   position: string;
   staffCode: string;
@@ -83,6 +85,7 @@ export interface Shop {
 export interface User {
   id: string;
   username: string;
+  fullName?: string;
   password?: string;
   phone: string;
   email?: string;
