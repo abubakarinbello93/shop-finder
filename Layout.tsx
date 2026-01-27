@@ -85,25 +85,16 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
       { name: 'Favorites', icon: Heart, path: '/favorites' },
     ];
 
-    const isOwner = shop && shop.ownerId === user.id;
-
     if (user.shopId) {
-      const staffMember = shop?.staff.find(s => s.id === user.id);
+      baseItems.splice(1, 0, { name: 'Inventory', icon: Package, path: '/services' });
       
-      // Permissions Logic
-      const canEditInventory = isOwner || user.canAddItems;
-      const canSeeStaff = isOwner || user.canSeeStaffOnDuty;
-      const canManageRegister = isOwner || user.canManageRegister;
-
-      if (canEditInventory) {
-        baseItems.splice(1, 0, { name: 'Inventory', icon: Package, path: '/services' });
+      const isOwner = shop?.ownerId === user.id;
+      
+      if (isOwner || user.canSeeDuty) {
+        baseItems.push({ name: 'Staff on Duty', icon: Users, path: '/duty' });
       }
-
-      if (canSeeStaff) {
-        baseItems.push({ name: 'Staff on Duty', icon: Users, path: '/staff-duty' });
-      }
-
-      if (canManageRegister) {
+      
+      if (isOwner || user.canManageRegister) {
         baseItems.push({ name: 'Register', icon: ClipboardList, path: '/register' });
       }
 
