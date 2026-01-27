@@ -1,4 +1,3 @@
-
 export type BusinessDay = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export interface BusinessHour {
@@ -14,7 +13,7 @@ export interface ServiceItem {
   name: string;
   time?: string;
   available: boolean;
-  restockDate?: number;
+  restockDate?: number; 
 }
 
 export interface Shift {
@@ -22,7 +21,7 @@ export interface Shift {
   name: string;
   start: string; // HH:mm
   end: string;   // HH:mm
-  durationHours: number;
+  hours: number;
 }
 
 export interface Staff {
@@ -30,26 +29,24 @@ export interface Staff {
   username: string;
   password?: string;
   position: string;
-  uniqueCode: string; // 4 numbers, 2 alphabets e.g. 1234AB
+  staffCode: string;
   canAddItems: boolean; 
   canSeeStaffOnDuty: boolean;
   canManageRegister: boolean;
-  eligibleShifts: string[]; // Array of Shift IDs
+  eligibleShifts: string[]; // IDs of shifts from shiftLibrary
 }
 
 export interface AttendanceRecord {
   id: string;
   staffId: string;
-  staffName: string;
-  shiftId: string;
   date: string; // YYYY-MM-DD
-  signInTime?: number;
-  signOutTime?: number;
-  isAbsent: boolean;
+  status: 'Present' | 'Absent' | 'Off';
+  signInTime?: any; // Firestore serverTimestamp
+  signOutTime?: any;
   overtimeMinutes: number;
   breaks: {
-    outAt: number;
-    backAt?: number;
+    outTime: any;
+    inTime?: any;
     approved: boolean;
   }[];
 }
@@ -87,11 +84,12 @@ export interface Shop {
   isOpen: boolean;
   isAutomatic: boolean;
   locationVisible: boolean;
-  currentStatus?: string;
+  currentStatus?: string; 
   businessHours: BusinessHour[];
   items: ServiceItem[];
   staff: Staff[];
   shiftLibrary: Shift[];
+  currentRegisterMonth?: string; // YYYY-MM
   location?: {
     lat: number;
     lng: number;
