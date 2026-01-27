@@ -15,6 +15,8 @@ import SettingsPage from './SettingsPage';
 import FavoritesPage from './FavoritesPage';
 import HistoryPage from './HistoryPage';
 import AdminDashboard from './AdminDashboard';
+import StaffOnDutyPage from './StaffOnDutyPage';
+import RegisterPage from './RegisterPage';
 
 // Helper to handle identifier to email mapping for Firebase Auth
 const identifierToEmail = (id: string) => {
@@ -161,7 +163,6 @@ const App: React.FC = () => {
       setLoading(true);
       
       if (isStaff && shopCode) {
-        // Staff Login: Find shop by unique code first
         const shopsRef = collection(db, 'shops');
         const q = query(shopsRef, where("code", "==", shopCode));
         const querySnapshot = await getDocs(q);
@@ -173,7 +174,6 @@ const App: React.FC = () => {
 
         const shopDoc = querySnapshot.docs[0];
         const shopData = shopDoc.data() as Shop;
-        // Verify staff exists within the shop's personnel array
         const staffMember = (shopData.staff || []).find(s => s.username === identifier && s.password === pass);
 
         if (staffMember) {
@@ -184,6 +184,8 @@ const App: React.FC = () => {
             isStaff: true,
             shopId: shopDoc.id,
             canAddItems: staffMember.canAddItems,
+            canSeeStaffOnDuty: staffMember.canSeeStaffOnDuty,
+            canManageRegister: staffMember.canManageRegister,
             favorites: []
           };
           setState(prev => ({ ...prev, currentUser: staffUser }));
@@ -251,6 +253,7 @@ const App: React.FC = () => {
             businessHours: [],
             items: [],
             staff: [],
+            shiftLibrary: [],
             location: shopData.location || null
           };
           const shopDocRef = await addDoc(collection(db, 'shops'), newShopRecord);
@@ -297,6 +300,7 @@ const App: React.FC = () => {
         businessHours: [],
         items: [],
         staff: [],
+        shiftLibrary: [],
         location: shopData.location || null
       };
       
@@ -330,7 +334,6 @@ const App: React.FC = () => {
           action: updates.isOpen ? 'Facility Opened' : 'Facility Closed'
         };
         
-        // Save to specific sub-collection for the shop and root collection for admin visibility
         await addDoc(collection(db, 'shops', shopId, 'history'), historyEntry);
         await addDoc(collection(db, 'history'), historyEntry);
       }
@@ -427,6 +430,8 @@ const App: React.FC = () => {
                 <Route path="/favorites" element={<FavoritesPage state={state} onLogout={logout} onToggleFavorite={toggleFavorite} onUpdateShop={updateShop} onAddComment={addComment} />} />
                 <Route path="/settings" element={<SettingsPage state={state} onLogout={logout} onUpdateShop={updateShop} onUpdatePassword={updatePassword} />} />
                 <Route path="/history" element={<HistoryPage state={state} onLogout={logout} onClearHistory={clearHistory} onUpdateShop={updateShop} />} />
+                <Route path="/staff-duty" element={<StaffOnDutyPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
+                <Route path="/register" element={<RegisterPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
               </>
             )}
             <Route path="*" element={<Navigate to={state.currentUser.isAdmin ? "/admin" : "/dashboard"} replace />} />
