@@ -18,7 +18,6 @@ import AdminDashboard from './AdminDashboard';
 import StaffOnDutyPage from './StaffOnDutyPage';
 import RegisterPage from './RegisterPage';
 
-// Helper to handle identifier to email mapping for Firebase Auth
 const identifierToEmail = (id: string) => {
   const cleaned = id.replace(/\s+/g, '').trim().toLowerCase();
   if (cleaned.includes('@')) return cleaned;
@@ -44,7 +43,6 @@ const App: React.FC = () => {
 
   const lastCheckedTime = useRef<string>('');
 
-  // 1. AUTH STATE OBSERVER
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -77,7 +75,6 @@ const App: React.FC = () => {
     return () => unsubscribeAuth();
   }, [state.currentUser?.isStaff]);
 
-  // 2. REAL-TIME CLOUD LISTENERS
   useEffect(() => {
     if (!state.currentUser) return;
 
@@ -116,7 +113,6 @@ const App: React.FC = () => {
     };
   }, [state.currentUser?.id]);
 
-  // 3. AUTOMATIC MODE TIMER
   useEffect(() => {
     const checkSchedules = async () => {
       if (state.shops.length === 0) return;
@@ -184,7 +180,7 @@ const App: React.FC = () => {
             isStaff: true,
             shopId: shopDoc.id,
             canAddItems: staffMember.canAddItems,
-            canSeeStaffOnDuty: staffMember.canSeeStaffOnDuty,
+            canSeeDuty: staffMember.canSeeDuty,
             canManageRegister: staffMember.canManageRegister,
             favorites: []
           };
@@ -430,7 +426,7 @@ const App: React.FC = () => {
                 <Route path="/favorites" element={<FavoritesPage state={state} onLogout={logout} onToggleFavorite={toggleFavorite} onUpdateShop={updateShop} onAddComment={addComment} />} />
                 <Route path="/settings" element={<SettingsPage state={state} onLogout={logout} onUpdateShop={updateShop} onUpdatePassword={updatePassword} />} />
                 <Route path="/history" element={<HistoryPage state={state} onLogout={logout} onClearHistory={clearHistory} onUpdateShop={updateShop} />} />
-                <Route path="/staff-duty" element={<StaffOnDutyPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
+                <Route path="/duty" element={<StaffOnDutyPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
                 <Route path="/register" element={<RegisterPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
               </>
             )}
