@@ -19,7 +19,8 @@ import {
   Moon,
   Coffee,
   AlertTriangle,
-  FileText
+  FileText,
+  ShieldAlert
 } from 'lucide-react';
 import Layout from './Layout';
 import { AppState, Shop, Staff, Shift } from './types';
@@ -57,8 +58,16 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
   const monthYear = `${new Date().getMonth() + 1}_${new Date().getFullYear()}`;
   const todayStr = new Date().toISOString().split('T')[0];
 
+  const hasPermission = useMemo(() => {
+    if (!currentUser || !userShop) return false;
+    return userShop.ownerId === currentUser.id || currentUser.canManageRegister;
+  }, [currentUser, userShop]);
+
   useEffect(() => {
-    if (!userShop) return;
+    if (!userShop || !hasPermission) {
+      setIsLoading(false);
+      return;
+    }
 
     // Listen for today's entries
     const entriesRef = collection(db, 'shops', userShop.id, 'registers', monthYear, 'entries');
@@ -67,16 +76,21 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
     const unsubEntries = onSnapshot(q, (snapshot) => {
       setDailyEntries(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setIsLoading(false);
+    }, (error) => {
+      console.error("Register Entries Stream Error:", error);
+      setIsLoading(false);
     });
 
     // Listen for monthly statistics
     const statsUnsub = onSnapshot(entriesRef, (snapshot) => {
       const all = snapshot.docs.map(d => d.data());
       setMonthlyStats(all);
+    }, (error) => {
+      console.error("Monthly Stats Stream Error:", error);
     });
 
     return () => { unsubEntries(); statsUnsub(); };
-  }, [userShop?.id, monthYear]);
+  }, [userShop?.id, monthYear, hasPermission]);
 
   const handleAddShift = () => {
     if (!userShop || !newShift.name) return;
@@ -133,7 +147,6 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
       let lateMinutes = 0;
       let expectedHours = 0;
 
-      // Calculate Expected Hours based on eligibility and presence
       const eligibleShifts = userShop.shiftLibrary.filter(sh => s.eligibleShifts?.includes(sh.id));
       const avgShiftDuration = eligibleShifts.length > 0 
         ? eligibleShifts.reduce((acc, curr) => acc + curr.durationHours, 0) / eligibleShifts.length 
@@ -179,7 +192,34 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
     window.print();
   };
 
-  if (!userShop) return <Layout user={currentUser!} onLogout={onLogout}><div className="p-20 text-center font-black">Link a facility to manage registers.</div></Layout>;
+  // Check 3: Permissions Check - Show Access Denied instead of blank screen
+  if (!hasPermission) {
+    return (
+      <Layout user={currentUser!} onLogout={onLogout}>
+        <div className="flex flex-col items-center justify-center py-40 text-center animate-in fade-in duration-700">
+           <div className="p-10 bg-red-50 rounded-[50px] mb-8">
+             <ShieldAlert className="h-20 w-20 text-red-400" />
+           </div>
+           <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Access Denied</h2>
+           <p className="text-slate-400 font-bold max-w-sm mt-4 text-lg">
+             You do not have permission to view or manage the Register. Please contact the facility owner for access.
+           </p>
+           <button 
+             onClick={() => navigate('/dashboard')}
+             className="mt-10 px-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase tracking-widest text-xs shadow-xl hover:bg-black transition-all"
+           >
+             Back to Dashboard
+           </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!userShop) return (
+    <Layout user={currentUser!} onLogout={onLogout}>
+      <div className="p-20 text-center font-black">Link a facility to manage registers.</div>
+    </Layout>
+  );
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
