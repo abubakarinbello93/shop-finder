@@ -140,14 +140,16 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
 
   const staffSummary = useMemo(() => {
     if (!userShop) return [];
-    return userShop.staff.map(s => {
+    // Safety Fix 5: Fallback to empty array if staff is missing
+    return (userShop.staff || []).map(s => {
       const staffEntries = monthlyStats.filter(e => e.staffId === s.id);
       
       let actualMinutes = 0;
       let lateMinutes = 0;
       let expectedHours = 0;
 
-      const eligibleShifts = userShop.shiftLibrary.filter(sh => s.eligibleShifts?.includes(sh.id));
+      // Safety Fix 1: Use fallback array for shiftLibrary
+      const eligibleShifts = (userShop.shiftLibrary || []).filter(sh => s.eligibleShifts?.includes(sh.id));
       const avgShiftDuration = eligibleShifts.length > 0 
         ? eligibleShifts.reduce((acc, curr) => acc + curr.durationHours, 0) / eligibleShifts.length 
         : 8;
@@ -160,13 +162,13 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
           expectedHours += avgShiftDuration;
           
           if (e.signOut) {
-            const start = e.signIn.seconds * 1000;
-            const end = e.signOut.seconds * 1000;
+            const start = (e.signIn?.seconds || 0) * 1000;
+            const end = (e.signOut?.seconds || 0) * 1000;
             let duration = (end - start) / 60000;
             
             if (e.comeBack && !e.breakApproved) {
-               const bStart = e.wentOut.seconds * 1000;
-               const bEnd = e.comeBack.seconds * 1000;
+               const bStart = (e.wentOut?.seconds || 0) * 1000;
+               const bEnd = (e.comeBack?.seconds || 0) * 1000;
                const bDur = (bEnd - bStart) / 60000;
                duration -= bDur;
                lateMinutes += bDur;
@@ -191,6 +193,17 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
   const handlePrint = () => {
     window.print();
   };
+
+  // Safety Fix 4: Add Loading State before hasPermission check
+  if (isLoading) {
+    return (
+      <Layout user={currentUser!} onLogout={onLogout}>
+        <div className="p-20 text-center font-black animate-pulse uppercase tracking-[0.2em] text-slate-400">
+          Loading Register Data...
+        </div>
+      </Layout>
+    );
+  }
 
   // Check 3: Permissions Check - Show Access Denied instead of blank screen
   if (!hasPermission) {
@@ -269,7 +282,8 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {userShop.staff.filter(s => s.username.toLowerCase().includes(searchTerm.toLowerCase()) || s.staffCode.includes(searchTerm)).map(s => {
+            {/* Safety Fix 2 & 5: Ensure staff list and staffCode check are safe */}
+            {(userShop.staff || []).filter(s => s.username.toLowerCase().includes(searchTerm.toLowerCase()) || (s.staffCode || '').includes(searchTerm)).map(s => {
                const entry = dailyEntries.find(e => e.staffId === s.id);
                const isOnline = entry?.signIn && !entry?.signOut && !entry?.absent;
                const isAbsent = entry?.absent;
@@ -383,6 +397,7 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {/* Safety Fix 3: Ensure we map over shiftLibrary safely */}
              {(userShop.shiftLibrary || []).map(shift => (
                 <div key={shift.id} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm relative group hover:border-blue-200 transition-all">
                    <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl w-fit mb-6">
@@ -404,7 +419,7 @@ const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateSh
                    </div>
 
                    <button 
-                     onClick={() => onUpdateShop(userShop.id, { shiftLibrary: userShop.shiftLibrary.filter(s => s.id !== shift.id) })}
+                     onClick={() => onUpdateShop(userShop.id, { shiftLibrary: (userShop.shiftLibrary || []).filter(s => s.id !== shift.id) })}
                      className="absolute top-6 right-6 p-3 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                    >
                       <Trash2 className="h-5 w-5" />
