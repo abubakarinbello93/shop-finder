@@ -13,15 +13,15 @@ export interface ServiceItem {
   name: string;
   time?: string;
   available: boolean;
-  restockDate?: number; 
+  restockDate?: number; // Timestamp for when the item becomes available again
 }
 
 export interface Shift {
   id: string;
   name: string;
-  start: string; // HH:mm
-  end: string;   // HH:mm
-  hours: number;
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  durationHours: number;
 }
 
 export interface Staff {
@@ -31,24 +31,9 @@ export interface Staff {
   position: string;
   staffCode: string;
   canAddItems: boolean; 
-  canSeeStaffOnDuty: boolean;
+  canSeeDuty: boolean;
   canManageRegister: boolean;
-  eligibleShifts: string[]; // IDs of shifts from shiftLibrary
-}
-
-export interface AttendanceRecord {
-  id: string;
-  staffId: string;
-  date: string; // YYYY-MM-DD
-  status: 'Present' | 'Absent' | 'Off';
-  signInTime?: any; // Firestore serverTimestamp
-  signOutTime?: any;
-  overtimeMinutes: number;
-  breaks: {
-    outTime: any;
-    inTime?: any;
-    approved: boolean;
-  }[];
+  eligibleShifts: string[]; // Array of Shift IDs
 }
 
 export interface HistoryItem {
@@ -64,7 +49,7 @@ export interface HistoryItem {
 export interface Comment {
   id: string;
   userId: string;
-  shopId: string; 
+  shopId: string;
   username: string;
   text: string;
   timestamp: number;
@@ -84,12 +69,11 @@ export interface Shop {
   isOpen: boolean;
   isAutomatic: boolean;
   locationVisible: boolean;
-  currentStatus?: string; 
+  currentStatus?: string;
   businessHours: BusinessHour[];
   items: ServiceItem[];
   staff: Staff[];
   shiftLibrary: Shift[];
-  currentRegisterMonth?: string; // YYYY-MM
   location?: {
     lat: number;
     lng: number;
@@ -106,7 +90,7 @@ export interface User {
   isStaff?: boolean; 
   isAdmin?: boolean; 
   canAddItems?: boolean;
-  canSeeStaffOnDuty?: boolean;
+  canSeeDuty?: boolean;
   canManageRegister?: boolean;
   favorites: string[]; 
 }
