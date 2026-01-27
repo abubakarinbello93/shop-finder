@@ -176,6 +176,7 @@ const App: React.FC = () => {
           const staffUser: User = {
             id: staffMember.id,
             username: staffMember.username,
+            fullName: staffMember.fullName,
             phone: '',
             isStaff: true,
             shopId: shopDoc.id,
