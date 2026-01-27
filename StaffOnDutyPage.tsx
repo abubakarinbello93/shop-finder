@@ -49,7 +49,7 @@ const StaffOnDutyPage: React.FC<{ state: AppState, onLogout: () => void, onUpdat
 
     // Filter by search
     const filtered = matched.filter(e => 
-      e.profile.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (e.profile.fullName || e.profile.username).toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.profile.position.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -57,7 +57,9 @@ const StaffOnDutyPage: React.FC<{ state: AppState, onLogout: () => void, onUpdat
     return filtered.sort((a, b) => {
       const posCompare = a.profile.position.localeCompare(b.profile.position);
       if (posCompare !== 0) return posCompare;
-      return a.profile.username.localeCompare(b.profile.username);
+      const nameA = (a.profile.fullName || a.profile.username);
+      const nameB = (b.profile.fullName || b.profile.username);
+      return nameA.localeCompare(nameB);
     });
   }, [activeEntries, userShop, searchTerm]);
 
@@ -127,10 +129,11 @@ const StaffOnDutyPage: React.FC<{ state: AppState, onLogout: () => void, onUpdat
                 <div className="flex items-start justify-between mb-8">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-[24px] bg-blue-50 text-blue-600 flex items-center justify-center font-black text-2xl shadow-inner group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      {entry.profile.username.charAt(0)}
+                      {(entry.profile.fullName || entry.profile.username).charAt(0)}
                     </div>
                     <div>
-                      <h3 className="font-black text-xl text-slate-900 tracking-tight leading-none mb-2 uppercase">{entry.profile.username}</h3>
+                      {/* Logic Change 4: Use fullName for display */}
+                      <h3 className="font-black text-xl text-slate-900 tracking-tight leading-none mb-2 uppercase">{entry.profile.fullName || entry.profile.username}</h3>
                       <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
                         <Briefcase className="h-3 w-3" /> {entry.profile.position}
                       </p>
