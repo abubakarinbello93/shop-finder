@@ -94,6 +94,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
         baseItems.push({ name: 'Staff on Duty', icon: Users, path: '/duty' });
       }
       
+      // Check 4: Sidebar Link - Path set to exactly '/register'
       if (isOwner || user.canManageRegister) {
         baseItems.push({ name: 'Register', icon: ClipboardList, path: '/register' });
       }
