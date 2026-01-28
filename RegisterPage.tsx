@@ -19,7 +19,7 @@ interface RegisterPageProps {
 const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateShop }) => {
   const navigate = useNavigate();
   const { currentUser, shops } = state;
-  const userShop = shops.find(s => s.id === currentUser?.shopId);
+  const userShop = (shops || []).find(s => s.id === currentUser?.shopId);
   
   const [activeTab, setActiveTab] = useState<'daily' | 'monthly'>('daily');
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
@@ -30,12 +30,18 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   useEffect(() => {
-    if (!userShop) return;
+    if (!userShop) {
+      setLoading(false);
+      return;
+    }
     
     // Listener for today's daily register
     const qDaily = query(collection(db, 'shops', userShop.id, 'attendance'), where('date', '==', today));
     const unsubDaily = onSnapshot(qDaily, (snapshot) => {
       setAttendance(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+      setLoading(false);
+    }, (error) => {
+      console.error("Daily register error:", error);
       setLoading(false);
     });
 
@@ -45,6 +51,8 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
     const qMonthly = query(collection(db, 'shops', userShop.id, 'attendance'), where('date', '>=', startOfMonth), where('date', '<=', endOfMonth));
     const unsubMonthly = onSnapshot(qMonthly, (snapshot) => {
       setMonthlyAttendance(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+    }, (error) => {
+      console.error("Monthly register error:", error);
     });
 
     return () => { unsubDaily(); unsubMonthly(); };
@@ -84,96 +92,128 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
         await setDoc(recordRef, { staffId, date: today, status: 'Absent', breaks: [], overtimeMinutes: 0 });
       }
     } catch (e) {
-      console.error(e);
+      console.error("Register action error:", e);
     }
   };
 
   const handleSaveOvertime = async (staffId: string, minutes: number) => {
     if (!userShop) return;
-    const recordRef = doc(db, 'shops', userShop.id, 'attendance', `${staffId}_${today}`);
-    await updateDoc(recordRef, { overtimeMinutes: minutes });
-    alert("Overtime recorded!");
+    try {
+      const recordRef = doc(db, 'shops', userShop.id, 'attendance', `${staffId}_${today}`);
+      await updateDoc(recordRef, { overtimeMinutes: minutes });
+      alert("Overtime recorded!");
+    } catch (e) {
+      console.error("Overtime save error:", e);
+    }
   };
 
   const clearRecordsForMonth = async () => {
     if (!userShop || !window.confirm("ARE YOU SURE? This will permanently delete all attendance records for THIS MONTH.")) return;
-    const batch = writeBatch(db);
-    const startOfMonth = `${selectedMonth}-01`;
-    const endOfMonth = `${selectedMonth}-31`;
-    const q = query(collection(db, 'shops', userShop.id, 'attendance'), where('date', '>=', startOfMonth), where('date', '<=', endOfMonth));
-    const snap = await getDocs(q);
-    snap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-    alert("Fresh Start: Records Cleared.");
+    try {
+      const batch = writeBatch(db);
+      const startOfMonth = `${selectedMonth}-01`;
+      const endOfMonth = `${selectedMonth}-31`;
+      const q = query(collection(db, 'shops', userShop.id, 'attendance'), where('date', '>=', startOfMonth), where('date', '<=', endOfMonth));
+      const snap = await getDocs(q);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      alert("Fresh Start: Records Cleared.");
+    } catch (e) {
+      console.error("Clear records error:", e);
+    }
   };
 
   // Performance Math
   const monthlyStats = useMemo(() => {
     if (!userShop) return [];
-    return eligibleStaff.map(staff => {
-      const records = monthlyAttendance.filter(r => r.staffId === staff.id);
-      
-      let He = 0; // Expected Hours
-      let Ha = 0; // Actual Hours
-      let P = 0;  // Penalties (minutes)
-
-      records.forEach(rec => {
-        // Calculate Expected hours from eligible shifts for days present or absent
-        // Assuming we take the average duration of assigned shifts for that staff
-        const totalEligibleDuration = (staff.eligibleShifts || []).reduce((acc, shiftId) => {
-          const shift = userShop.shifts.find(s => s.id === shiftId);
-          if (shift) {
-            const [sh, sm] = shift.start.split(':').map(Number);
-            const [eh, em] = shift.end.split(':').map(Number);
-            let duration = (eh * 60 + em) - (sh * 60 + sm);
-            if (duration < 0) duration += 24 * 60; // Overnight
-            return acc + duration;
-          }
-          return acc;
-        }, 0);
+    try {
+      return eligibleStaff.map(staff => {
+        const records = monthlyAttendance.filter(r => r.staffId === staff.id);
         
-        const dayHe = totalEligibleDuration / (staff.eligibleShifts.length || 1);
-        He += dayHe;
+        let He = 0; // Expected Hours
+        let Ha = 0; // Actual Hours
+        let P = 0;  // Penalties (minutes)
 
-        if (rec.status === 'Absent') {
-          P += dayHe; // Penalty for absent day is the whole expected duration
-        } else if (rec.signIn && rec.signOut) {
-          // Ha = (Out - In) - UnapprovedBreaks + Overtime
-          const totalInMins = (rec.signOut - rec.signIn) / (1000 * 60);
-          const unapprovedBreakMins = rec.breaks.filter(b => !b.approved).reduce((acc, b) => {
-            if (b.end && b.start) return acc + (b.end - b.start) / (1000 * 60);
+        records.forEach(rec => {
+          const totalEligibleDuration = (staff.eligibleShifts || []).reduce((acc, shiftId) => {
+            const shift = (userShop.shifts || []).find(s => s.id === shiftId);
+            if (shift) {
+              const [sh, sm] = (shift.start || "09:00").split(':').map(Number);
+              const [eh, em] = (shift.end || "17:00").split(':').map(Number);
+              let duration = (eh * 60 + em) - (sh * 60 + sm);
+              if (duration < 0) duration += 24 * 60; // Overnight
+              return acc + duration;
+            }
             return acc;
           }, 0);
           
-          Ha += (totalInMins - unapprovedBreakMins + rec.overtimeMinutes);
-          
-          // Late Penalty
-          const firstShift = userShop.shifts.find(s => s.id === staff.eligibleShifts[0]);
-          if (firstShift) {
-            const [sh, sm] = firstShift.start.split(':').map(Number);
-            const inDate = new Date(rec.signIn);
-            const shiftStart = new Date(rec.signIn);
-            shiftStart.setHours(sh, sm, 0, 0);
-            if (inDate.getTime() > shiftStart.getTime()) {
-              P += (inDate.getTime() - shiftStart.getTime()) / (1000 * 60);
-            }
-          }
-          
-          // Unapproved Break Penalty
-          P += unapprovedBreakMins;
-        }
-      });
+          const dayHe = totalEligibleDuration / (staff.eligibleShifts?.length || 1);
+          He += dayHe;
 
-      return {
-        staff,
-        expectedHours: (He / 60).toFixed(1),
-        actualHours: (Ha / 60).toFixed(1),
-        penaltyMinutes: Math.round(P)
-      };
-    });
+          if (rec.status === 'Absent') {
+            P += dayHe; // Penalty for absent day
+          } else if (rec.signIn && rec.signOut) {
+            const totalInMins = (rec.signOut - rec.signIn) / (1000 * 60);
+            const unapprovedBreakMins = (rec.breaks || []).filter(b => !b.approved).reduce((acc, b) => {
+              if (b.end && b.start) return acc + (b.end - b.start) / (1000 * 60);
+              return acc;
+            }, 0);
+            
+            Ha += (totalInMins - unapprovedBreakMins + (rec.overtimeMinutes || 0));
+            
+            // Late Penalty
+            const firstShiftId = staff.eligibleShifts?.[0];
+            const firstShift = (userShop.shifts || []).find(s => s.id === firstShiftId);
+            if (firstShift) {
+              const [sh, sm] = (firstShift.start || "09:00").split(':').map(Number);
+              const inDate = new Date(rec.signIn);
+              const shiftStart = new Date(rec.signIn);
+              shiftStart.setHours(sh, sm, 0, 0);
+              if (inDate.getTime() > shiftStart.getTime()) {
+                P += (inDate.getTime() - shiftStart.getTime()) / (1000 * 60);
+              }
+            }
+            
+            // Unapproved Break Penalty
+            P += unapprovedBreakMins;
+          }
+        });
+
+        return {
+          staff,
+          expectedHours: (He / 60).toFixed(1),
+          actualHours: (Ha / 60).toFixed(1),
+          penaltyMinutes: Math.round(P)
+        };
+      });
+    } catch (err) {
+      console.error("Monthly stats computation error:", err);
+      return [];
+    }
   }, [eligibleStaff, monthlyAttendance, userShop]);
 
-  if (!userShop) return <Layout user={currentUser!} onLogout={onLogout}>Restricted</Layout>;
+  if (loading) {
+    return (
+      <Layout user={currentUser!} onLogout={onLogout}>
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 font-black text-slate-400 uppercase tracking-widest text-xs">Syncing Register...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!userShop) {
+    return (
+      <Layout user={currentUser!} onLogout={onLogout}>
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+           <AlertCircle className="h-12 w-12 text-slate-200 mb-4" />
+           <h2 className="text-xl font-black text-slate-900 uppercase">Restricted Area</h2>
+           <p className="text-sm font-bold text-slate-400 mt-2">Only facility owners and authorized staff can access the register.</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
@@ -189,7 +229,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
         
         {activeTab === 'monthly' && (
           <div className="flex gap-3">
-             <input type="month" className="p-4 bg-white border-2 rounded-2xl font-black text-sm" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+             <input type="month" className="p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-indigo-600 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
              <button onClick={clearRecordsForMonth} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all border-2 border-red-100"><RefreshCw className="h-5 w-5" /></button>
           </div>
         )}
@@ -197,20 +237,28 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
 
       {activeTab === 'daily' ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
-            {eligibleStaff.map(staff => {
-              const rec = attendance.find(r => r.staffId === staff.id);
-              return (
-                <DailyStaffCard 
-                  key={staff.id} 
-                  staff={staff} 
-                  record={rec} 
-                  onAction={(action, approved) => handleAction(staff.id, action, approved)} 
-                  onSaveOvertime={(mins) => handleSaveOvertime(staff.id, mins)}
-                />
-              );
-            })}
-          </div>
+          {eligibleStaff.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {eligibleStaff.map(staff => {
+                const rec = attendance.find(r => r.staffId === staff.id);
+                return (
+                  <DailyStaffCard 
+                    key={staff.id} 
+                    staff={staff} 
+                    record={rec} 
+                    onAction={(action, approved) => handleAction(staff.id, action, approved)} 
+                    onSaveOvertime={(mins) => handleSaveOvertime(staff.id, mins)}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-20 text-center bg-white rounded-[40px] border-4 border-dashed border-slate-50">
+               <UserMinus className="h-16 w-16 text-slate-100 mx-auto mb-4" />
+               <h3 className="text-xl font-black text-slate-300 uppercase">No eligible staff</h3>
+               <p className="text-sm font-bold text-slate-400 mt-2">Go to Settings to assign shifts and grant management access.</p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
@@ -262,7 +310,6 @@ const DailyStaffCard: React.FC<{
   onSaveOvertime: (mins: number) => void
 }> = ({ staff, record, onAction, onSaveOvertime }) => {
   const [ot, setOt] = useState(record?.overtimeMinutes || 0);
-  const [showBreakDialog, setShowBreakDialog] = useState(false);
 
   const statusColors: any = {
     'Present': 'bg-green-500',
@@ -291,8 +338,8 @@ const DailyStaffCard: React.FC<{
         <div className="flex-1 flex flex-col md:flex-row items-center gap-6 justify-end">
           {!record || record.status === 'Absent' ? (
             <div className="flex gap-2">
-              <button onClick={() => onAction('in')} className="px-6 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg shadow-green-100 text-xs uppercase tracking-widest flex items-center gap-2"><Check className="h-4 w-4" /> Sign In</button>
-              <button onClick={() => onAction('absent')} className="px-6 py-4 bg-red-50 text-red-600 border-2 border-red-100 font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2"><X className="h-4 w-4" /> Absent</button>
+              <button onClick={() => onAction('in')} className="px-6 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg shadow-green-100 text-xs uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95"><Check className="h-4 w-4" /> Sign In</button>
+              <button onClick={() => onAction('absent')} className="px-6 py-4 bg-red-50 text-red-600 border-2 border-red-100 font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95"><X className="h-4 w-4" /> Absent</button>
             </div>
           ) : (
             <>
@@ -300,20 +347,20 @@ const DailyStaffCard: React.FC<{
                 <div className="flex gap-2">
                   {record.status === 'On Break' ? (
                     <div className="flex gap-2 animate-in fade-in zoom-in">
-                       <button onClick={() => onAction('break_end', true)} className="px-4 py-3 bg-green-50 text-green-600 border-2 border-green-100 font-black rounded-xl text-[10px] uppercase">Approved End</button>
-                       <button onClick={() => onAction('break_end', false)} className="px-4 py-3 bg-orange-50 text-orange-600 border-2 border-orange-100 font-black rounded-xl text-[10px] uppercase">Unapproved End</button>
+                       <button onClick={() => onAction('break_end', true)} className="px-4 py-3 bg-green-50 text-green-600 border-2 border-green-100 font-black rounded-xl text-[10px] uppercase active:scale-95 transition-all">Approved End</button>
+                       <button onClick={() => onAction('break_end', false)} className="px-4 py-3 bg-orange-50 text-orange-600 border-2 border-orange-100 font-black rounded-xl text-[10px] uppercase active:scale-95 transition-all">Unapproved End</button>
                     </div>
                   ) : (
-                    <button onClick={() => onAction('break_start')} className="px-6 py-4 bg-orange-50 text-orange-600 font-black rounded-2xl border-2 border-orange-100 text-xs uppercase tracking-widest flex items-center gap-2"><Coffee className="h-4 w-4" /> Went Out</button>
+                    <button onClick={() => onAction('break_start')} className="px-6 py-4 bg-orange-50 text-orange-600 font-black rounded-2xl border-2 border-orange-100 text-xs uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-all"><Coffee className="h-4 w-4" /> Went Out</button>
                   )}
-                  <button onClick={() => onAction('out')} className="px-6 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2">Sign Out</button>
+                  <button onClick={() => onAction('out')} className="px-6 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-all">Sign Out</button>
                 </div>
               )}
               
               <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl">
-                 <input type="number" className="w-16 p-3 bg-white border-2 rounded-xl font-black text-center text-xs outline-none" value={ot} onChange={e => setOt(Number(e.target.value))} />
+                 <input type="number" className="w-16 p-3 bg-white border-2 rounded-xl font-black text-center text-xs outline-none focus:border-blue-600 transition-all" value={ot} onChange={e => setOt(Number(e.target.value))} />
                  <p className="text-[10px] font-black text-slate-400 uppercase">Min OT</p>
-                 <button onClick={() => onSaveOvertime(ot)} className="p-3 bg-blue-600 text-white rounded-xl shadow-lg"><Save className="h-4 w-4" /></button>
+                 <button onClick={() => onSaveOvertime(ot)} className="p-3 bg-blue-600 text-white rounded-xl shadow-lg active:scale-95 transition-all"><Save className="h-4 w-4" /></button>
               </div>
             </>
           )}
