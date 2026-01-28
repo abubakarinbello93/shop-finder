@@ -75,8 +75,10 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
         await setDoc(recordRef, {
           staffId, date: today, signIn: Date.now(), status: 'Present', breaks: [], overtimeMinutes: 0
         });
+        console.log(`Staff ${staffId} signed in.`);
       } else if (action === 'out') {
         await updateDoc(recordRef, { signOut: Date.now(), status: 'Sign Out' });
+        console.log(`Staff ${staffId} signed out.`);
       } else if (action === 'break_start') {
         const breaks = [...(existing?.breaks || []), { start: Date.now(), approved: false }];
         await updateDoc(recordRef, { breaks, status: 'On Break' });
@@ -91,8 +93,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
       } else if (action === 'absent') {
         await setDoc(recordRef, { staffId, date: today, status: 'Absent', breaks: [], overtimeMinutes: 0 });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Register action error:", e);
+      alert(`Update failed: ${e.message}`);
     }
   };
 
@@ -101,9 +104,10 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
     try {
       const recordRef = doc(db, 'shops', userShop.id, 'attendance', `${staffId}_${today}`);
       await updateDoc(recordRef, { overtimeMinutes: minutes });
-      alert("Overtime recorded!");
-    } catch (e) {
+      alert("Overtime recorded successfully!");
+    } catch (e: any) {
       console.error("Overtime save error:", e);
+      alert(`Failed to save overtime: ${e.message}`);
     }
   };
 
@@ -118,8 +122,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
       snap.docs.forEach(d => batch.delete(d.ref));
       await batch.commit();
       alert("Fresh Start: Records Cleared.");
-    } catch (e) {
+    } catch (e: any) {
       console.error("Clear records error:", e);
+      alert(`Failed to clear records: ${e.message}`);
     }
   };
 
@@ -195,7 +200,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
   if (loading) {
     return (
       <Layout user={currentUser!} onLogout={onLogout}>
-        <div className="flex flex-col items-center justify-center h-64">
+        <div className="flex flex-col items-center justify-center h-64 w-full">
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           <p className="mt-4 font-black text-slate-400 uppercase tracking-widest text-xs">Syncing Register...</p>
         </div>
@@ -206,7 +211,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
   if (!userShop) {
     return (
       <Layout user={currentUser!} onLogout={onLogout}>
-        <div className="flex flex-col items-center justify-center h-64 text-center">
+        <div className="flex flex-col items-center justify-center h-64 text-center w-full">
            <AlertCircle className="h-12 w-12 text-slate-200 mb-4" />
            <h2 className="text-xl font-black text-slate-900 uppercase">Restricted Area</h2>
            <p className="text-sm font-bold text-slate-400 mt-2">Only facility owners and authorized staff can access the register.</p>
@@ -217,88 +222,92 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
-      <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div>
-          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-4 hover:gap-3 transition-all"><ArrowLeft className="h-5 w-5" /> Workspace</button>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Register Management</h1>
-          <div className="flex gap-4 mt-6">
-            <button onClick={() => setActiveTab('daily')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'daily' ? 'bg-blue-600 text-white shadow-xl shadow-blue-100' : 'bg-white border text-slate-400'}`}>Daily Call</button>
-            <button onClick={() => setActiveTab('monthly')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'monthly' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border text-slate-400'}`}>Monthly Records</button>
-          </div>
-        </div>
-        
-        {activeTab === 'monthly' && (
-          <div className="flex gap-3">
-             <input type="month" className="p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-indigo-600 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
-             <button onClick={clearRecordsForMonth} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all border-2 border-red-100"><RefreshCw className="h-5 w-5" /></button>
-          </div>
-        )}
-      </div>
-
-      {activeTab === 'daily' ? (
-        <div className="space-y-4">
-          {eligibleStaff.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4">
-              {eligibleStaff.map(staff => {
-                const rec = attendance.find(r => r.staffId === staff.id);
-                return (
-                  <DailyStaffCard 
-                    key={staff.id} 
-                    staff={staff} 
-                    record={rec} 
-                    onAction={(action, approved) => handleAction(staff.id, action, approved)} 
-                    onSaveOvertime={(mins) => handleSaveOvertime(staff.id, mins)}
-                  />
-                );
-              })}
+      <div className="w-full min-h-full flex flex-col">
+        <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 w-full">
+          <div>
+            <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-4 hover:gap-3 transition-all"><ArrowLeft className="h-5 w-5" /> Workspace</button>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Register Management</h1>
+            <div className="flex gap-4 mt-6">
+              <button onClick={() => setActiveTab('daily')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'daily' ? 'bg-blue-600 text-white shadow-xl shadow-blue-100' : 'bg-white border text-slate-400'}`}>Daily Call</button>
+              <button onClick={() => setActiveTab('monthly')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'monthly' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border text-slate-400'}`}>Monthly Records</button>
             </div>
-          ) : (
-            <div className="p-20 text-center bg-white rounded-[40px] border-4 border-dashed border-slate-50">
-               <UserMinus className="h-16 w-16 text-slate-100 mx-auto mb-4" />
-               <h3 className="text-xl font-black text-slate-300 uppercase">No eligible staff</h3>
-               <p className="text-sm font-bold text-slate-400 mt-2">Go to Settings to assign shifts and grant management access.</p>
+          </div>
+          
+          {activeTab === 'monthly' && (
+            <div className="flex gap-3">
+              <input type="month" className="p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-indigo-600 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+              <button onClick={clearRecordsForMonth} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all border-2 border-red-100"><RefreshCw className="h-5 w-5" /></button>
             </div>
           )}
         </div>
-      ) : (
-        <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                <tr>
-                  <th className="px-8 py-6">Staff Member</th>
-                  <th className="px-8 py-6">Contact</th>
-                  <th className="px-8 py-6 text-center">Expected (Hr)</th>
-                  <th className="px-8 py-6 text-center">Actual (Hr)</th>
-                  <th className="px-8 py-6 text-center">Penalty (Min)</th>
-                  <th className="px-8 py-6 text-right">Performance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {monthlyStats.map(({ staff, expectedHours, actualHours, penaltyMinutes }) => (
-                  <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">{staff.fullName.charAt(0)}</div>
-                        <span className="font-black text-slate-900">{staff.fullName}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-slate-500 font-bold text-sm">{staff.phone}</td>
-                    <td className="px-8 py-6 text-center font-black text-slate-700">{expectedHours}</td>
-                    <td className="px-8 py-6 text-center font-black text-indigo-600">{actualHours}</td>
-                    <td className="px-8 py-6 text-center font-black text-red-500">{penaltyMinutes}</td>
-                    <td className="px-8 py-6 text-right">
-                       <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${Number(actualHours) >= Number(expectedHours) ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                         {Number(actualHours) >= Number(expectedHours) ? 'Excellent' : 'Deficit'}
-                       </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+        <div className="flex-1 w-full">
+          {activeTab === 'daily' ? (
+            <div className="space-y-4 w-full">
+              {eligibleStaff.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 w-full">
+                  {eligibleStaff.map(staff => {
+                    const rec = attendance.find(r => r.staffId === staff.id);
+                    return (
+                      <DailyStaffCard 
+                        key={staff.id} 
+                        staff={staff} 
+                        record={rec} 
+                        onAction={(action, approved) => handleAction(staff.id, action, approved)} 
+                        onSaveOvertime={(mins) => handleSaveOvertime(staff.id, mins)}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-20 text-center bg-white rounded-[40px] border-4 border-dashed border-slate-50 w-full">
+                  <UserMinus className="h-16 w-16 text-slate-100 mx-auto mb-4" />
+                  <h3 className="text-xl font-black text-slate-300 uppercase">No eligible staff</h3>
+                  <p className="text-sm font-bold text-slate-400 mt-2">Go to Settings to assign shifts and grant management access.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden w-full">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left min-w-[800px]">
+                  <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <tr>
+                      <th className="px-8 py-6">Staff Member</th>
+                      <th className="px-8 py-6">Contact</th>
+                      <th className="px-8 py-6 text-center">Expected (Hr)</th>
+                      <th className="px-8 py-6 text-center">Actual (Hr)</th>
+                      <th className="px-8 py-6 text-center">Penalty (Min)</th>
+                      <th className="px-8 py-6 text-right">Performance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {monthlyStats.map(({ staff, expectedHours, actualHours, penaltyMinutes }) => (
+                      <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">{staff.fullName.charAt(0)}</div>
+                            <span className="font-black text-slate-900">{staff.fullName}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-slate-500 font-bold text-sm">{staff.phone}</td>
+                        <td className="px-8 py-6 text-center font-black text-slate-700">{expectedHours}</td>
+                        <td className="px-8 py-6 text-center font-black text-indigo-600">{actualHours}</td>
+                        <td className="px-8 py-6 text-center font-black text-red-500">{penaltyMinutes}</td>
+                        <td className="px-8 py-6 text-right">
+                          <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${Number(actualHours) >= Number(expectedHours) ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                            {Number(actualHours) >= Number(expectedHours) ? 'Excellent' : 'Deficit'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </Layout>
   );
 };
@@ -319,10 +328,10 @@ const DailyStaffCard: React.FC<{
   };
 
   return (
-    <div className="p-8 bg-white border-2 border-transparent rounded-[32px] shadow-sm hover:border-blue-100 transition-all">
-      <div className="flex flex-col xl:flex-row gap-8 justify-between">
-        <div className="flex items-start gap-6">
-          <div className="w-16 h-16 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center font-black text-xl border">
+    <div className="p-8 bg-white border-2 border-transparent rounded-[32px] shadow-sm hover:border-blue-100 transition-all w-full">
+      <div className="flex flex-col xl:flex-row gap-8 justify-between items-center md:items-start">
+        <div className="flex items-start gap-6 w-full md:w-auto">
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center font-black text-xl border shrink-0">
             {staff.fullName.charAt(0)}
           </div>
           <div>
@@ -335,31 +344,31 @@ const DailyStaffCard: React.FC<{
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col md:flex-row items-center gap-6 justify-end">
+        <div className="flex-1 flex flex-col md:flex-row items-center gap-6 justify-end w-full md:w-auto">
           {!record || record.status === 'Absent' ? (
-            <div className="flex gap-2">
-              <button onClick={() => onAction('in')} className="px-6 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg shadow-green-100 text-xs uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95"><Check className="h-4 w-4" /> Sign In</button>
-              <button onClick={() => onAction('absent')} className="px-6 py-4 bg-red-50 text-red-600 border-2 border-red-100 font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95"><X className="h-4 w-4" /> Absent</button>
+            <div className="flex gap-2 w-full md:w-auto">
+              <button onClick={() => onAction('in')} className="flex-1 md:flex-none px-6 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg shadow-green-100 text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"><Check className="h-4 w-4" /> Sign In</button>
+              <button onClick={() => onAction('absent')} className="flex-1 md:flex-none px-6 py-4 bg-red-50 text-red-600 border-2 border-red-100 font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"><X className="h-4 w-4" /> Absent</button>
             </div>
           ) : (
             <>
               {record.status !== 'Sign Out' && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full md:w-auto">
                   {record.status === 'On Break' ? (
-                    <div className="flex gap-2 animate-in fade-in zoom-in">
-                       <button onClick={() => onAction('break_end', true)} className="px-4 py-3 bg-green-50 text-green-600 border-2 border-green-100 font-black rounded-xl text-[10px] uppercase active:scale-95 transition-all">Approved End</button>
-                       <button onClick={() => onAction('break_end', false)} className="px-4 py-3 bg-orange-50 text-orange-600 border-2 border-orange-100 font-black rounded-xl text-[10px] uppercase active:scale-95 transition-all">Unapproved End</button>
+                    <div className="flex gap-2 animate-in fade-in zoom-in w-full md:w-auto">
+                       <button onClick={() => onAction('break_end', true)} className="flex-1 md:flex-none px-4 py-3 bg-green-50 text-green-600 border-2 border-green-100 font-black rounded-xl text-[10px] uppercase active:scale-95 transition-all">Approved End</button>
+                       <button onClick={() => onAction('break_end', false)} className="flex-1 md:flex-none px-4 py-3 bg-orange-50 text-orange-600 border-2 border-orange-100 font-black rounded-xl text-[10px] uppercase active:scale-95 transition-all">Unapproved End</button>
                     </div>
                   ) : (
-                    <button onClick={() => onAction('break_start')} className="px-6 py-4 bg-orange-50 text-orange-600 font-black rounded-2xl border-2 border-orange-100 text-xs uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-all"><Coffee className="h-4 w-4" /> Went Out</button>
+                    <button onClick={() => onAction('break_start')} className="flex-1 md:flex-none px-6 py-4 bg-orange-50 text-orange-600 font-black rounded-2xl border-2 border-orange-100 text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"><Coffee className="h-4 w-4" /> Went Out</button>
                   )}
-                  <button onClick={() => onAction('out')} className="px-6 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-all">Sign Out</button>
+                  <button onClick={() => onAction('out')} className="flex-1 md:flex-none px-6 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">Sign Out</button>
                 </div>
               )}
               
-              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl">
+              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl w-full md:w-auto">
                  <input type="number" className="w-16 p-3 bg-white border-2 rounded-xl font-black text-center text-xs outline-none focus:border-blue-600 transition-all" value={ot} onChange={e => setOt(Number(e.target.value))} />
-                 <p className="text-[10px] font-black text-slate-400 uppercase">Min OT</p>
+                 <p className="text-[10px] font-black text-slate-400 uppercase flex-1 md:flex-none text-center">Min OT</p>
                  <button onClick={() => onSaveOvertime(ot)} className="p-3 bg-blue-600 text-white rounded-xl shadow-lg active:scale-95 transition-all"><Save className="h-4 w-4" /></button>
               </div>
             </>
