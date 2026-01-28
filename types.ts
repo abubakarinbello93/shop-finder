@@ -19,40 +19,45 @@ export interface ServiceItem {
 export interface Shift {
   id: string;
   name: string;
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+  start: string; // HH:mm
+  end: string; // HH:mm
+}
+
+export interface StaffPermissions {
+  editInventory: boolean;
+  seeStaffOnDuty: boolean;
+  registerManagement: boolean;
+  statusControl: boolean;
 }
 
 export interface Staff {
   id: string;
-  username?: string; // Legacy
   fullName: string;
   phone: string;
   password?: string;
-  staffCode: string; // 6-character unique code
-  position?: string;
-  canAddItems: boolean; 
-  canManageRegister: boolean;
-  canSeeStaffOnDuty: boolean;
-  canControlStatus: boolean;
-  eligibleShiftIds: string[];
+  code: string; // 6-character unique code
+  position: string;
+  eligibleShifts: string[]; // Array of Shift IDs
+  permissions: StaffPermissions;
+  canAddItems?: boolean; // Legacy field for compatibility
 }
 
 export interface BreakRecord {
-  outAt: number;
-  inAt?: number;
-  isApproved: boolean;
+  start: number;
+  end?: number;
+  approved: boolean;
 }
 
 export interface AttendanceRecord {
   id: string;
   staffId: string;
   date: string; // YYYY-MM-DD
-  status: 'Present' | 'Absent' | 'None';
-  timeIn?: number;
-  timeOut?: number;
+  signIn?: number;
+  signOut?: number;
+  // Added 'Sign Out' to the status union to match implementation in RegisterPage.tsx
+  status: 'Present' | 'Absent' | 'On Break' | 'Sign Out';
   breaks: BreakRecord[];
-  overtimeMins: number;
+  overtimeMinutes: number;
   assignedShiftId?: string;
 }
 
@@ -103,17 +108,14 @@ export interface Shop {
 export interface User {
   id: string;
   username: string;
-  fullName?: string;
   password?: string;
   phone: string;
   email?: string;
   shopId?: string;
   isStaff?: boolean; 
   isAdmin?: boolean; 
-  canAddItems?: boolean;
-  canManageRegister?: boolean;
-  canSeeStaffOnDuty?: boolean;
-  canControlStatus?: boolean;
+  canAddItems?: boolean; // Legacy
+  permissions?: StaffPermissions; // For staff users
   favorites: string[]; 
 }
 
