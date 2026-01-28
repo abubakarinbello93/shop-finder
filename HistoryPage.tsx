@@ -52,10 +52,10 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ state, onLogout, onClearHisto
             batch.delete(doc.ref);
           });
           await batch.commit();
-          console.log(`OpenShop: Cleaned up ${oldDocs.size} logs older than 30 days.`);
+          console.log(`Shop Finder: Cleaned up ${oldDocs.size} logs older than 30 days.`);
         }
       } catch (err) {
-        console.error("OpenShop: Automated history cleanup failed:", err);
+        console.error("Shop Finder: Automated history cleanup failed:", err);
       }
     };
 
@@ -188,7 +188,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ state, onLogout, onClearHisto
         <div className="text-center md:text-left">
           <p className="text-sm font-black text-blue-900 uppercase tracking-[0.2em] mb-2">Automated Retention Policy</p>
           <p className="text-xs font-bold text-blue-700 leading-relaxed uppercase tracking-tight">
-            OpenShop automatically purges activity logs older than 30 days to maintain high performance and ensure privacy. 
+            Shop Finder automatically purges activity logs older than 30 days to maintain high performance and ensure privacy. 
           </p>
         </div>
       </div>
