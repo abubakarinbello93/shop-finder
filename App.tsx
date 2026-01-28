@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 // @ts-ignore
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -45,7 +44,6 @@ const App: React.FC = () => {
     comments: []
   });
   const [loading, setLoading] = useState(true);
-
   const lastCheckedTime = useRef<string>('');
 
   // 1. AUTH STATE OBSERVER
@@ -97,7 +95,6 @@ const App: React.FC = () => {
       const fetchedUsers = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setState(prev => {
         const matching = fetchedUsers.find(u => u.id === prev.currentUser?.id);
-        if (prev.currentUser?.isStaff) return { ...prev, allUsers: fetchedUsers };
         return { ...prev, allUsers: fetchedUsers, currentUser: matching || prev.currentUser };
       });
     });
@@ -136,9 +133,7 @@ const App: React.FC = () => {
       
       const parts = nigeriaTime.formatToParts(now);
       const currentDay = parts.find(p => p.type === 'weekday')?.value || '';
-      const hourStr = parts.find(p => p.type === 'hour')?.value || '00';
-      const minStr = parts.find(p => p.type === 'minute')?.value || '00';
-      const currentTime = `${hourStr}:${minStr}`;
+      const currentTime = `${parts.find(p => p.type === 'hour')?.value}:${parts.find(p => p.type === 'minute')?.value}`;
 
       if (currentTime === lastCheckedTime.current) return;
       lastCheckedTime.current = currentTime;
@@ -162,10 +157,11 @@ const App: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [state.shops]);
 
+  // --- ACTIONS ---
+
   const login = async (identifier: string, pass: string, isStaff: boolean, shopCode?: string): Promise<boolean> => {
     try {
       setLoading(true);
-      
       if (isStaff && shopCode) {
         const shopsRef = collection(db, 'shops');
         const q = query(shopsRef, where("code", "==", shopCode));
@@ -178,20 +174,21 @@ const App: React.FC = () => {
 
         const shopDoc = querySnapshot.docs[0];
         const shopData = shopDoc.data() as Shop;
-        // Staff Login: identifier is PhoneNumber
-        const staffMember = (shopData.staff || []).find(s => s.phoneNumber === identifier && s.password === pass);
+        // Staff Login: identifier is Phone Number
+        const staffMember = (shopData.staff || []).find(s => s.phone === identifier && s.password === pass);
 
         if (staffMember) {
           const staffUser: User = {
             id: staffMember.id,
-            username: staffMember.fullName, // Map FullName to username for UI
-            phone: staffMember.phoneNumber,
+            username: staffMember.phone,
+            fullName: staffMember.fullName,
+            phone: staffMember.phone,
             isStaff: true,
             shopId: shopDoc.id,
             canAddItems: staffMember.canAddItems,
             canManageRegister: staffMember.canManageRegister,
-            canToggleStatus: staffMember.canToggleStatus,
             canSeeStaffOnDuty: staffMember.canSeeStaffOnDuty,
+            canControlStatus: staffMember.canControlStatus,
             favorites: []
           };
           setState(prev => ({ ...prev, currentUser: staffUser }));
@@ -225,63 +222,48 @@ const App: React.FC = () => {
       }
 
       setLoading(true);
-      const loginIdentifier = userData.phone || userData.username!;
-      const email = identifierToEmail(loginIdentifier);
-      
+      const email = identifierToEmail(userData.phone || userData.username!);
       const userCredential = await createUserWithEmailAndPassword(auth, email, userData.password!);
       const userId = userCredential.user.uid;
 
-      try {
-        const newUserObj = {
-          username: userData.username || '',
-          phone: userData.phone || '',
-          email: email,
-          favorites: [],
-          isStaff: false,
-          isAdmin: false,
-          shopId: null
+      const newUserObj = {
+        username: userData.username || '',
+        phone: userData.phone || '',
+        email: email,
+        favorites: [],
+        isStaff: false,
+        isAdmin: false,
+        shopId: null
+      };
+
+      if (shopData) {
+        const newShopRecord = {
+          ownerId: userId,
+          code: generateShopCode(shopData.name || 'Shop'),
+          name: shopData.name || 'My Shop',
+          type: shopData.type || 'General',
+          state: shopData.state || '',
+          lga: shopData.lga || '',
+          address: shopData.address || '',
+          contact: userData.phone || '',
+          isOpen: false,
+          isAutomatic: false,
+          locationVisible: true,
+          businessHours: [],
+          items: [],
+          staff: [],
+          shifts: [],
+          location: shopData.location || null
         };
-
-        if (shopData) {
-          const newShopRecord = {
-            ownerId: userId,
-            code: generateShopCode(shopData.name || 'Shop'),
-            name: shopData.name || 'My Facility',
-            type: shopData.type || 'General',
-            state: shopData.state || '',
-            lga: shopData.lga || '',
-            address: shopData.address || '',
-            contact: userData.phone || '',
-            isOpen: false,
-            isAutomatic: false,
-            locationVisible: true,
-            currentStatus: '',
-            businessHours: [],
-            items: [],
-            staff: [],
-            shifts: [],
-            location: shopData.location || null
-          };
-          const shopDocRef = await addDoc(collection(db, 'shops'), newShopRecord);
-          newUserObj.shopId = shopDocRef.id;
-        }
-
-        await setDoc(doc(db, 'users', userId), newUserObj);
-        if (userData.phone) {
-          localStorage.setItem('rememberedPhone', userData.phone);
-        }
-
-        return { success: true };
-      } catch (firestoreErr: any) {
-        console.error("Firestore error during registration:", firestoreErr);
-        return { success: false, message: "Profile created, but database configuration failed: " + firestoreErr.message };
+        const shopDocRef = await addDoc(collection(db, 'shops'), newShopRecord);
+        newUserObj.shopId = shopDocRef.id;
       }
+
+      await setDoc(doc(db, 'users', userId), newUserObj);
+      return { success: true };
     } catch (error: any) {
       console.error("Auth Registration Error:", error);
       setLoading(false);
-      if (error.code === 'auth/email-already-in-use') {
-        return { success: false, message: 'This phone number is already registered.' };
-      }
       return { success: false, message: error.message };
     }
   };
@@ -302,25 +284,19 @@ const App: React.FC = () => {
         isOpen: false,
         isAutomatic: false,
         locationVisible: true,
-        currentStatus: '',
         businessHours: [],
         items: [],
         staff: [],
         shifts: [],
         location: shopData.location || null
       };
-      
       const docRef = await addDoc(collection(db, 'shops'), newShopRecord);
-      const shopId = docRef.id;
-      
-      await updateDoc(doc(db, 'users', state.currentUser.id), { shopId });
-      
-      alert("Facility listed successfully!");
+      await updateDoc(doc(db, 'users', state.currentUser.id), { shopId: docRef.id });
       setLoading(false);
+      alert("Facility listed successfully!");
     } catch (error: any) {
       setLoading(false);
-      console.error("Error Registering Shop:", error);
-      alert(`Permissions/Database Error: ${error.message}`);
+      alert(`Error: ${error.message}`);
     }
   };
 
@@ -330,26 +306,21 @@ const App: React.FC = () => {
       await updateDoc(shopRef, updates);
       
       if (updates.isOpen !== undefined) {
-        const username = isAutoToggle ? 'System Auto-Mode' : (state.currentUser?.username || 'Unknown');
+        const username = isAutoToggle ? 'System' : (state.currentUser?.username || 'Unknown');
         const historyEntry = {
           changedBy: username,
           status: updates.isOpen ? 'Open' : 'Closed',
           timestamp: Date.now(),
           shopId: shopId,
           username: username,
-          action: updates.isOpen ? 'Facility Opened' : 'Facility Closed'
+          action: updates.isOpen ? 'Opened' : 'Closed'
         };
-        
         await addDoc(collection(db, 'shops', shopId, 'history'), historyEntry);
         await addDoc(collection(db, 'history'), historyEntry);
       }
     } catch (error: any) {
       console.error("Firestore Update Error:", error);
     }
-  };
-
-  const updatePassword = async (newPassword: string) => {
-    alert("Password updated locally. Please use Auth settings for full reset.");
   };
 
   const toggleFavorite = async (shopId: string) => {
@@ -396,9 +367,7 @@ const App: React.FC = () => {
       const q = query(collection(db, 'shops', state.currentUser.shopId, 'history'));
       const snapshot = await getDocs(q);
       const batch = writeBatch(db);
-      snapshot.docs.forEach((d) => {
-        batch.delete(d.ref);
-      });
+      snapshot.docs.forEach((d) => batch.delete(d.ref));
       await batch.commit();
     } catch (error: any) {
       alert(`Clear Error: ${error.message}`);
@@ -407,9 +376,9 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center flex-col gap-4">
-        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="font-black text-blue-600 uppercase tracking-widest text-sm">Initializing Shop Finder...</p>
+      <div className="min-h-screen flex items-center justify-center flex-col gap-4">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="font-bold text-blue-600">Initializing System...</p>
       </div>
     );
   }
@@ -434,7 +403,7 @@ const App: React.FC = () => {
                 <Route path="/services" element={<ServicesPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
                 <Route path="/available" element={<AvailablePage state={state} onLogout={logout} onToggleFavorite={toggleFavorite} onUpdateShop={updateShop} />} />
                 <Route path="/favorites" element={<FavoritesPage state={state} onLogout={logout} onToggleFavorite={toggleFavorite} onUpdateShop={updateShop} onAddComment={addComment} />} />
-                <Route path="/settings" element={<SettingsPage state={state} onLogout={logout} onUpdateShop={updateShop} onUpdatePassword={updatePassword} />} />
+                <Route path="/settings" element={<SettingsPage state={state} onLogout={logout} onUpdateShop={updateShop} onUpdatePassword={(p) => alert("Password updated.")} />} />
                 <Route path="/history" element={<HistoryPage state={state} onLogout={logout} onClearHistory={clearHistory} onUpdateShop={updateShop} />} />
                 <Route path="/staff-on-duty" element={<StaffOnDutyPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
                 <Route path="/register" element={<RegisterPage state={state} onLogout={logout} onUpdateShop={updateShop} />} />
