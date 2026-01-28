@@ -65,23 +65,38 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
   }, [userShop]);
 
   const handleAction = async (staffId: string, action: 'in' | 'out' | 'break_start' | 'break_end' | 'absent', breakApproved?: boolean) => {
-    if (!userShop) return;
+    if (!userShop) {
+      console.error("Register Error: No linked shop found.");
+      return;
+    }
+    
     const recordId = `${staffId}_${today}`;
     const recordRef = doc(db, 'shops', userShop.id, 'attendance', recordId);
     const existing = attendance.find(r => r.staffId === staffId);
 
     try {
+      console.log(`Attempting Firestore action: ${action} for staff ${staffId} at path: shops/${userShop.id}/attendance/${recordId}`);
+      
       if (action === 'in') {
         await setDoc(recordRef, {
-          staffId, date: today, signIn: Date.now(), status: 'Present', breaks: [], overtimeMinutes: 0
-        });
-        console.log(`Staff ${staffId} signed in.`);
+          staffId, 
+          date: today, 
+          signIn: Date.now(), 
+          status: 'Present', 
+          breaks: [], 
+          overtimeMinutes: 0
+        }, { merge: true });
       } else if (action === 'out') {
-        await updateDoc(recordRef, { signOut: Date.now(), status: 'Sign Out' });
-        console.log(`Staff ${staffId} signed out.`);
+        await setDoc(recordRef, { 
+          signOut: Date.now(), 
+          status: 'Sign Out' 
+        }, { merge: true });
       } else if (action === 'break_start') {
         const breaks = [...(existing?.breaks || []), { start: Date.now(), approved: false }];
-        await updateDoc(recordRef, { breaks, status: 'On Break' });
+        await setDoc(recordRef, { 
+          breaks, 
+          status: 'On Break' 
+        }, { merge: true });
       } else if (action === 'break_end') {
         const breaks = [...(existing?.breaks || [])];
         const last = breaks[breaks.length - 1];
@@ -89,13 +104,27 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
           last.end = Date.now();
           last.approved = breakApproved || false;
         }
-        await updateDoc(recordRef, { breaks, status: 'Present' });
+        await setDoc(recordRef, { 
+          breaks, 
+          status: 'Present' 
+        }, { merge: true });
       } else if (action === 'absent') {
-        await setDoc(recordRef, { staffId, date: today, status: 'Absent', breaks: [], overtimeMinutes: 0 });
+        await setDoc(recordRef, { 
+          staffId, 
+          date: today, 
+          status: 'Absent', 
+          breaks: [], 
+          overtimeMinutes: 0 
+        }, { merge: true });
       }
+      console.log("Firestore action successful.");
     } catch (e: any) {
-      console.error("Register action error:", e);
-      alert(`Update failed: ${e.message}`);
+      console.error("CRITICAL REGISTER ERROR:", e);
+      if (e.code === 'permission-denied') {
+        alert("PERMISSION DENIED: Please ensure you have updated your Firestore Security Rules in the Firebase Console as requested.");
+      } else {
+        alert(`Update failed: ${e.message}`);
+      }
     }
   };
 
@@ -103,7 +132,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
     if (!userShop) return;
     try {
       const recordRef = doc(db, 'shops', userShop.id, 'attendance', `${staffId}_${today}`);
-      await updateDoc(recordRef, { overtimeMinutes: minutes });
+      await setDoc(recordRef, { overtimeMinutes: minutes }, { merge: true });
       alert("Overtime recorded successfully!");
     } catch (e: any) {
       console.error("Overtime save error:", e);
