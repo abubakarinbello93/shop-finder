@@ -174,7 +174,6 @@ const App: React.FC = () => {
 
         const shopDoc = querySnapshot.docs[0];
         const shopData = shopDoc.data() as Shop;
-        // Staff Login: Identifier is now Phone Number
         const staffMember = (shopData.staff || []).find(s => s.phone === identifier && s.password === pass);
 
         if (staffMember) {
@@ -402,7 +401,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center flex-col gap-4">
         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="font-black text-blue-600 uppercase tracking-widest text-sm">Initializing Shop Finder...</p>
+        <p className="font-black text-blue-600 uppercase tracking-widest text-sm">Initializing Openshop...</p>
       </div>
     );
   }
