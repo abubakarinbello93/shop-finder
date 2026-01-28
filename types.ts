@@ -23,37 +23,37 @@ export interface Shift {
   endTime: string; // HH:mm
 }
 
+export interface Staff {
+  id: string;
+  username?: string; // Legacy
+  fullName: string;
+  phone: string;
+  password?: string;
+  staffCode: string; // 6-character unique code
+  position?: string;
+  canAddItems: boolean; 
+  canManageRegister: boolean;
+  canSeeStaffOnDuty: boolean;
+  canControlStatus: boolean;
+  eligibleShiftIds: string[];
+}
+
 export interface BreakRecord {
-  wentOut: number;
-  cameIn?: number;
-  approved?: boolean;
+  outAt: number;
+  inAt?: number;
+  isApproved: boolean;
 }
 
 export interface AttendanceRecord {
   id: string;
   staffId: string;
-  shopId: string;
   date: string; // YYYY-MM-DD
-  signInTime?: number;
-  signOutTime?: number;
+  status: 'Present' | 'Absent' | 'None';
+  timeIn?: number;
+  timeOut?: number;
   breaks: BreakRecord[];
-  isAbsent: boolean;
-  overtimeMinutes: number;
+  overtimeMins: number;
   assignedShiftId?: string;
-}
-
-export interface Staff {
-  id: string;
-  fullName: string;
-  phoneNumber: string;
-  password?: string;
-  code: string; // 6-character unique code
-  position: string;
-  canAddItems: boolean; 
-  canManageRegister: boolean;
-  canToggleStatus: boolean;
-  canSeeStaffOnDuty: boolean;
-  assignedShiftIds: string[]; // IDs from the Shift Library
 }
 
 export interface HistoryItem {
@@ -93,7 +93,7 @@ export interface Shop {
   businessHours: BusinessHour[];
   items: ServiceItem[];
   staff: Staff[];
-  shifts: Shift[]; // Shift Library
+  shifts: Shift[];
   location?: {
     lat: number;
     lng: number;
@@ -103,6 +103,7 @@ export interface Shop {
 export interface User {
   id: string;
   username: string;
+  fullName?: string;
   password?: string;
   phone: string;
   email?: string;
@@ -111,8 +112,8 @@ export interface User {
   isAdmin?: boolean; 
   canAddItems?: boolean;
   canManageRegister?: boolean;
-  canToggleStatus?: boolean;
   canSeeStaffOnDuty?: boolean;
+  canControlStatus?: boolean;
   favorites: string[]; 
 }
 
