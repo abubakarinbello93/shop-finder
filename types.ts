@@ -1,4 +1,3 @@
-
 export type BusinessDay = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
 
 export interface BusinessHour {
@@ -14,7 +13,7 @@ export interface ServiceItem {
   name: string;
   time?: string;
   available: boolean;
-  restockDate?: number; 
+  restockDate?: number; // Timestamp for when the item becomes available again
 }
 
 export interface Shift {
@@ -22,20 +21,39 @@ export interface Shift {
   name: string;
   startTime: string; // HH:mm
   endTime: string; // HH:mm
-  durationHours: number;
+}
+
+export interface BreakRecord {
+  wentOut: number;
+  cameIn?: number;
+  approved?: boolean;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  staffId: string;
+  shopId: string;
+  date: string; // YYYY-MM-DD
+  signInTime?: number;
+  signOutTime?: number;
+  breaks: BreakRecord[];
+  isAbsent: boolean;
+  overtimeMinutes: number;
+  assignedShiftId?: string;
 }
 
 export interface Staff {
   id: string;
-  username: string;
   fullName: string;
+  phoneNumber: string;
   password?: string;
+  code: string; // 6-character unique code
   position: string;
-  staffCode: string;
   canAddItems: boolean; 
-  canSeeDuty: boolean;
   canManageRegister: boolean;
-  eligibleShifts: string[]; // Array of Shift IDs
+  canToggleStatus: boolean;
+  canSeeStaffOnDuty: boolean;
+  assignedShiftIds: string[]; // IDs from the Shift Library
 }
 
 export interface HistoryItem {
@@ -51,7 +69,7 @@ export interface HistoryItem {
 export interface Comment {
   id: string;
   userId: string;
-  shopId: string;
+  shopId: string; 
   username: string;
   text: string;
   timestamp: number;
@@ -71,11 +89,11 @@ export interface Shop {
   isOpen: boolean;
   isAutomatic: boolean;
   locationVisible: boolean;
-  currentStatus?: string;
+  currentStatus?: string; 
   businessHours: BusinessHour[];
   items: ServiceItem[];
   staff: Staff[];
-  shiftLibrary: Shift[];
+  shifts: Shift[]; // Shift Library
   location?: {
     lat: number;
     lng: number;
@@ -85,7 +103,6 @@ export interface Shop {
 export interface User {
   id: string;
   username: string;
-  fullName?: string;
   password?: string;
   phone: string;
   email?: string;
@@ -93,8 +110,9 @@ export interface User {
   isStaff?: boolean; 
   isAdmin?: boolean; 
   canAddItems?: boolean;
-  canSeeDuty?: boolean;
   canManageRegister?: boolean;
+  canToggleStatus?: boolean;
+  canSeeStaffOnDuty?: boolean;
   favorites: string[]; 
 }
 
