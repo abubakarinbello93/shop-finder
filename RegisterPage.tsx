@@ -1,491 +1,325 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ClipboardList, 
-  Plus, 
-  Trash2, 
-  Clock, 
-  ArrowLeft, 
-  X, 
-  Save, 
-  Check, 
-  Search, 
-  Printer, 
-  History, 
-  Calendar, 
-  MoreVertical,
-  LogOut,
-  LogIn,
-  Moon,
-  Coffee,
-  AlertTriangle,
-  FileText,
-  ShieldAlert
+  ClipboardList, ArrowLeft, Clock, Save, User, 
+  Calendar, Check, X, Coffee, AlertCircle, RefreshCw, 
+  UserMinus, TrendingUp, Calculator 
 } from 'lucide-react';
 import Layout from './Layout';
-import { AppState, Shop, Staff, Shift } from './types';
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp, 
-  setDoc, 
-  getDocs,
-  writeBatch
-} from 'firebase/firestore';
+import { AppState, Shop, AttendanceRecord, Staff, Shift } from './types';
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 
-const RegisterPage: React.FC<{ state: AppState, onLogout: () => void, onUpdateShop: (id: string, updates: Partial<Shop>) => void }> = ({ state, onLogout, onUpdateShop }) => {
+interface RegisterPageProps {
+  state: AppState;
+  onLogout: () => void;
+  onUpdateShop: (id: string, updates: Partial<Shop>) => void;
+}
+
+const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateShop }) => {
   const navigate = useNavigate();
   const { currentUser, shops } = state;
   const userShop = shops.find(s => s.id === currentUser?.shopId);
-
-  const [activeTab, setActiveTab] = useState<'daily' | 'monthly' | 'library'>('daily');
-  const [showShiftModal, setShowShiftModal] = useState(false);
-  const [showInitModal, setShowInitModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   
-  const [newShift, setNewShift] = useState<Partial<Shift>>({ name: '', startTime: '09:00', endTime: '17:00' });
-  const [dailyEntries, setDailyEntries] = useState<any[]>([]);
-  const [monthlyStats, setMonthlyStats] = useState<any[]>([]);
-
-  const monthYear = `${new Date().getMonth() + 1}_${new Date().getFullYear()}`;
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  const hasPermission = useMemo(() => {
-    if (!currentUser || !userShop) return false;
-    return userShop.ownerId === currentUser.id || currentUser.canManageRegister;
-  }, [currentUser, userShop]);
+  const [activeTab, setActiveTab] = useState<'daily' | 'monthly'>('daily');
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [monthlyAttendance, setMonthlyAttendance] = useState<AttendanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  
+  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   useEffect(() => {
-    if (!userShop || !hasPermission) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Listen for today's entries
-    const entriesRef = collection(db, 'shops', userShop.id, 'registers', monthYear, 'entries');
-    const q = query(entriesRef, where('date', '==', todayStr));
-
-    const unsubEntries = onSnapshot(q, (snapshot) => {
-      setDailyEntries(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Register Entries Stream Error:", error);
-      setIsLoading(false);
-    });
-
-    // Listen for monthly statistics
-    const statsUnsub = onSnapshot(entriesRef, (snapshot) => {
-      const all = snapshot.docs.map(d => d.data());
-      setMonthlyStats(all);
-    }, (error) => {
-      console.error("Monthly Stats Stream Error:", error);
-    });
-
-    return () => { unsubEntries(); statsUnsub(); };
-  }, [userShop?.id, monthYear, hasPermission]);
-
-  const handleAddShift = () => {
-    if (!userShop || !newShift.name) return;
-    const s1 = parseInt(newShift.startTime!.split(':')[0]);
-    const s2 = parseInt(newShift.endTime!.split(':')[0]);
-    const duration = s2 > s1 ? s2 - s1 : (24 - s1) + s2;
-
-    const shift: Shift = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newShift.name,
-      startTime: newShift.startTime!,
-      endTime: newShift.endTime!,
-      durationHours: duration
-    };
-
-    onUpdateShop(userShop.id, { shiftLibrary: [...(userShop.shiftLibrary || []), shift] });
-    setShowShiftModal(false);
-    setNewShift({ name: '', startTime: '09:00', endTime: '17:00' });
-  };
-
-  const handleRegisterAction = async (staffId: string, action: string, data?: any) => {
     if (!userShop) return;
-    const entryId = `${todayStr}_${staffId}`;
-    const entryRef = doc(db, 'shops', userShop.id, 'registers', monthYear, 'entries', entryId);
     
-    const updates: any = { 
-      staffId, 
-      date: todayStr, 
-      lastModified: serverTimestamp(),
-      changedBy: currentUser?.username 
-    };
+    // Listener for today's daily register
+    const qDaily = query(collection(db, 'shops', userShop.id, 'attendance'), where('date', '==', today));
+    const unsubDaily = onSnapshot(qDaily, (snapshot) => {
+      setAttendance(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+      setLoading(false);
+    });
 
-    switch(action) {
-      case 'signIn': updates.signIn = serverTimestamp(); updates.absent = false; break;
-      case 'signOut': updates.signOut = serverTimestamp(); break;
-      case 'wentOut': updates.wentOut = serverTimestamp(); break;
-      case 'comeBack': 
-        updates.comeBack = serverTimestamp();
-        updates.breakApproved = data.approved;
-        break;
-      case 'absent': updates.absent = true; updates.signIn = null; break;
-      case 'overtime': updates.overtimeMinutes = data.minutes; break;
+    // Listener for selected month's records
+    const startOfMonth = `${selectedMonth}-01`;
+    const endOfMonth = `${selectedMonth}-31`;
+    const qMonthly = query(collection(db, 'shops', userShop.id, 'attendance'), where('date', '>=', startOfMonth), where('date', '<=', endOfMonth));
+    const unsubMonthly = onSnapshot(qMonthly, (snapshot) => {
+      setMonthlyAttendance(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+    });
+
+    return () => { unsubDaily(); unsubMonthly(); };
+  }, [userShop?.id, selectedMonth, today]);
+
+  // Filter staff who have at least one eligible shift
+  const eligibleStaff = useMemo(() => {
+    if (!userShop) return [];
+    return (userShop.staff || []).filter(s => (s.eligibleShifts || []).length > 0);
+  }, [userShop]);
+
+  const handleAction = async (staffId: string, action: 'in' | 'out' | 'break_start' | 'break_end' | 'absent', breakApproved?: boolean) => {
+    if (!userShop) return;
+    const recordId = `${staffId}_${today}`;
+    const recordRef = doc(db, 'shops', userShop.id, 'attendance', recordId);
+    const existing = attendance.find(r => r.staffId === staffId);
+
+    try {
+      if (action === 'in') {
+        await setDoc(recordRef, {
+          staffId, date: today, signIn: Date.now(), status: 'Present', breaks: [], overtimeMinutes: 0
+        });
+      } else if (action === 'out') {
+        await updateDoc(recordRef, { signOut: Date.now(), status: 'Sign Out' });
+      } else if (action === 'break_start') {
+        const breaks = [...(existing?.breaks || []), { start: Date.now(), approved: false }];
+        await updateDoc(recordRef, { breaks, status: 'On Break' });
+      } else if (action === 'break_end') {
+        const breaks = [...(existing?.breaks || [])];
+        const last = breaks[breaks.length - 1];
+        if (last) {
+          last.end = Date.now();
+          last.approved = breakApproved || false;
+        }
+        await updateDoc(recordRef, { breaks, status: 'Present' });
+      } else if (action === 'absent') {
+        await setDoc(recordRef, { staffId, date: today, status: 'Absent', breaks: [], overtimeMinutes: 0 });
+      }
+    } catch (e) {
+      console.error(e);
     }
-
-    await setDoc(entryRef, updates, { merge: true });
   };
 
-  const staffSummary = useMemo(() => {
+  const handleSaveOvertime = async (staffId: string, minutes: number) => {
+    if (!userShop) return;
+    const recordRef = doc(db, 'shops', userShop.id, 'attendance', `${staffId}_${today}`);
+    await updateDoc(recordRef, { overtimeMinutes: minutes });
+    alert("Overtime recorded!");
+  };
+
+  const clearRecordsForMonth = async () => {
+    if (!userShop || !window.confirm("ARE YOU SURE? This will permanently delete all attendance records for THIS MONTH.")) return;
+    const batch = writeBatch(db);
+    const startOfMonth = `${selectedMonth}-01`;
+    const endOfMonth = `${selectedMonth}-31`;
+    const q = query(collection(db, 'shops', userShop.id, 'attendance'), where('date', '>=', startOfMonth), where('date', '<=', endOfMonth));
+    const snap = await getDocs(q);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    alert("Fresh Start: Records Cleared.");
+  };
+
+  // Performance Math
+  const monthlyStats = useMemo(() => {
     if (!userShop) return [];
-    // Safety Fix 5: Fallback to empty array if staff is missing
-    return (userShop.staff || []).map(s => {
-      const staffEntries = monthlyStats.filter(e => e.staffId === s.id);
+    return eligibleStaff.map(staff => {
+      const records = monthlyAttendance.filter(r => r.staffId === staff.id);
       
-      let actualMinutes = 0;
-      let lateMinutes = 0;
-      let expectedHours = 0;
+      let He = 0; // Expected Hours
+      let Ha = 0; // Actual Hours
+      let P = 0;  // Penalties (minutes)
 
-      // Safety Fix 1: Use fallback array for shiftLibrary
-      const eligibleShifts = (userShop.shiftLibrary || []).filter(sh => s.eligibleShifts?.includes(sh.id));
-      const avgShiftDuration = eligibleShifts.length > 0 
-        ? eligibleShifts.reduce((acc, curr) => acc + curr.durationHours, 0) / eligibleShifts.length 
-        : 8;
+      records.forEach(rec => {
+        // Calculate Expected hours from eligible shifts for days present or absent
+        // Assuming we take the average duration of assigned shifts for that staff
+        const totalEligibleDuration = (staff.eligibleShifts || []).reduce((acc, shiftId) => {
+          const shift = userShop.shifts.find(s => s.id === shiftId);
+          if (shift) {
+            const [sh, sm] = shift.start.split(':').map(Number);
+            const [eh, em] = shift.end.split(':').map(Number);
+            let duration = (eh * 60 + em) - (sh * 60 + sm);
+            if (duration < 0) duration += 24 * 60; // Overnight
+            return acc + duration;
+          }
+          return acc;
+        }, 0);
+        
+        const dayHe = totalEligibleDuration / (staff.eligibleShifts.length || 1);
+        He += dayHe;
 
-      staffEntries.forEach(e => {
-        if (e.absent) {
-          lateMinutes += (avgShiftDuration * 60);
-          expectedHours += avgShiftDuration;
-        } else if (e.signIn) {
-          expectedHours += avgShiftDuration;
+        if (rec.status === 'Absent') {
+          P += dayHe; // Penalty for absent day is the whole expected duration
+        } else if (rec.signIn && rec.signOut) {
+          // Ha = (Out - In) - UnapprovedBreaks + Overtime
+          const totalInMins = (rec.signOut - rec.signIn) / (1000 * 60);
+          const unapprovedBreakMins = rec.breaks.filter(b => !b.approved).reduce((acc, b) => {
+            if (b.end && b.start) return acc + (b.end - b.start) / (1000 * 60);
+            return acc;
+          }, 0);
           
-          if (e.signOut) {
-            const start = (e.signIn?.seconds || 0) * 1000;
-            const end = (e.signOut?.seconds || 0) * 1000;
-            let duration = (end - start) / 60000;
-            
-            if (e.comeBack && !e.breakApproved) {
-               const bStart = (e.wentOut?.seconds || 0) * 1000;
-               const bEnd = (e.comeBack?.seconds || 0) * 1000;
-               const bDur = (bEnd - bStart) / 60000;
-               duration -= bDur;
-               lateMinutes += bDur;
+          Ha += (totalInMins - unapprovedBreakMins + rec.overtimeMinutes);
+          
+          // Late Penalty
+          const firstShift = userShop.shifts.find(s => s.id === staff.eligibleShifts[0]);
+          if (firstShift) {
+            const [sh, sm] = firstShift.start.split(':').map(Number);
+            const inDate = new Date(rec.signIn);
+            const shiftStart = new Date(rec.signIn);
+            shiftStart.setHours(sh, sm, 0, 0);
+            if (inDate.getTime() > shiftStart.getTime()) {
+              P += (inDate.getTime() - shiftStart.getTime()) / (1000 * 60);
             }
-            
-            actualMinutes += duration;
           }
           
-          if (e.overtimeMinutes) actualMinutes += parseInt(e.overtimeMinutes);
+          // Unapproved Break Penalty
+          P += unapprovedBreakMins;
         }
       });
 
       return {
-        ...s,
-        expectedHours: expectedHours.toFixed(1),
-        actualHours: (actualMinutes / 60).toFixed(1),
-        lateTally: Math.round(lateMinutes)
+        staff,
+        expectedHours: (He / 60).toFixed(1),
+        actualHours: (Ha / 60).toFixed(1),
+        penaltyMinutes: Math.round(P)
       };
     });
-  }, [userShop, monthlyStats]);
+  }, [eligibleStaff, monthlyAttendance, userShop]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // Safety Fix 4: Add Loading State before hasPermission check
-  if (isLoading) {
-    return (
-      <Layout user={currentUser!} onLogout={onLogout}>
-        <div className="p-20 text-center font-black animate-pulse uppercase tracking-[0.2em] text-slate-400">
-          Loading Register Data...
-        </div>
-      </Layout>
-    );
-  }
-
-  // Check 3: Permissions Check - Show Access Denied instead of blank screen
-  if (!hasPermission) {
-    return (
-      <Layout user={currentUser!} onLogout={onLogout}>
-        <div className="flex flex-col items-center justify-center py-40 text-center animate-in fade-in duration-700">
-           <div className="p-10 bg-red-50 rounded-[50px] mb-8">
-             <ShieldAlert className="h-20 w-20 text-red-400" />
-           </div>
-           <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Access Denied</h2>
-           <p className="text-slate-400 font-bold max-w-sm mt-4 text-lg">
-             You do not have permission to view or manage the Register. Please contact the facility owner for access.
-           </p>
-           <button 
-             onClick={() => navigate('/dashboard')}
-             className="mt-10 px-10 py-4 bg-slate-900 text-white font-black rounded-2xl uppercase tracking-widest text-xs shadow-xl hover:bg-black transition-all"
-           >
-             Back to Dashboard
-           </button>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!userShop) return (
-    <Layout user={currentUser!} onLogout={onLogout}>
-      <div className="p-20 text-center font-black">Link a facility to manage registers.</div>
-    </Layout>
-  );
+  if (!userShop) return <Layout user={currentUser!} onLogout={onLogout}>Restricted</Layout>;
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
-      <div className="mb-10 no-print">
-        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-4 hover:gap-3 transition-all uppercase text-[10px] tracking-widest"><ArrowLeft className="h-4 w-4" /> Workspace</button>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div>
-            <h1 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none">Register System</h1>
-            <div className="flex items-center gap-4 mt-4">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 flex items-center gap-2">
-                 <Calendar className="h-3.5 w-3.5" /> {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
-              </span>
-            </div>
-          </div>
-          <div className="flex gap-3">
-             <button onClick={() => setShowInitModal(true)} className="flex items-center gap-3 px-6 py-4 bg-white border-2 border-slate-100 text-slate-900 font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                <History className="h-4 w-4" /> New Register
-             </button>
-             <button onClick={handlePrint} className="flex items-center gap-3 px-6 py-4 bg-slate-900 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200">
-                <Printer className="h-4 w-4" /> Print Sheet
-             </button>
+      <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-4 hover:gap-3 transition-all"><ArrowLeft className="h-5 w-5" /> Workspace</button>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Register Management</h1>
+          <div className="flex gap-4 mt-6">
+            <button onClick={() => setActiveTab('daily')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'daily' ? 'bg-blue-600 text-white shadow-xl shadow-blue-100' : 'bg-white border text-slate-400'}`}>Daily Call</button>
+            <button onClick={() => setActiveTab('monthly')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === 'monthly' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white border text-slate-400'}`}>Monthly Records</button>
           </div>
         </div>
-      </div>
-
-      <div className="flex border-b border-slate-100 mb-10 no-print">
-        {[
-          { id: 'daily', label: 'Call Register', icon: ClipboardList },
-          { id: 'monthly', label: 'Record & Summary', icon: FileText },
-          { id: 'library', label: 'Shift Library', icon: Clock }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 py-6 px-4 flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-[0.2em] transition-all border-b-4 ${activeTab === tab.id ? 'border-blue-600 text-blue-600 bg-blue-50/30' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-          >
-            <tab.icon className="h-4 w-4" /> {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'daily' && (
-        <div className="space-y-6 animate-in fade-in duration-500">
-          <div className="relative mb-10 max-w-xl no-print">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-            <input type="text" className="w-full pl-14 pr-6 py-5 bg-white border-2 border-transparent rounded-[24px] font-black text-lg shadow-sm focus:border-blue-600 outline-none" placeholder="Search by name or code..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        
+        {activeTab === 'monthly' && (
+          <div className="flex gap-3">
+             <input type="month" className="p-4 bg-white border-2 rounded-2xl font-black text-sm" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+             <button onClick={clearRecordsForMonth} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all border-2 border-red-100"><RefreshCw className="h-5 w-5" /></button>
           </div>
+        )}
+      </div>
 
+      {activeTab === 'daily' ? (
+        <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
-            {/* Safety Fix 2 & 5: Ensure staff list and staffCode check are safe */}
-            {(userShop.staff || []).filter(s => s.username.toLowerCase().includes(searchTerm.toLowerCase()) || (s.staffCode || '').includes(searchTerm)).map(s => {
-               const entry = dailyEntries.find(e => e.staffId === s.id);
-               const isOnline = entry?.signIn && !entry?.signOut && !entry?.absent;
-               const isAbsent = entry?.absent;
-               
-               return (
-                 <div key={s.id} className={`p-8 bg-white rounded-[40px] border-2 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6 ${isOnline ? 'border-blue-600 shadow-xl shadow-blue-50' : isAbsent ? 'border-red-100 bg-red-50/30' : 'border-transparent shadow-sm'}`}>
-                    <div className="flex items-center gap-6">
-                       <div className={`w-16 h-16 rounded-3xl flex items-center justify-center font-black text-xl ${isOnline ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>
-                          {s.username.charAt(0)}
-                       </div>
-                       <div>
-                          <h3 className="font-black text-xl text-slate-900 uppercase tracking-tight">{s.username}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.position}</span>
-                             <div className="w-1 h-1 rounded-full bg-slate-200" />
-                             <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">#{s.staffCode}</span>
-                          </div>
-                       </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                       {!isOnline && !isAbsent ? (
-                         <>
-                           <button onClick={() => handleRegisterAction(s.id, 'signIn')} className="px-6 py-3 bg-blue-600 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-blue-700 shadow-md flex items-center gap-2"><LogIn className="h-4 w-4" /> Sign In</button>
-                           <button onClick={() => handleRegisterAction(s.id, 'absent')} className="px-6 py-3 bg-red-50 text-red-600 font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-red-100 flex items-center gap-2"><X className="h-4 w-4" /> Absent</button>
-                         </>
-                       ) : isOnline ? (
-                         <>
-                           <button onClick={() => handleRegisterAction(s.id, 'signOut')} className="px-6 py-3 bg-slate-900 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest flex items-center gap-2"><LogOut className="h-4 w-4" /> Sign Out</button>
-                           {!entry.wentOut ? (
-                             <button onClick={() => handleRegisterAction(s.id, 'wentOut')} className="px-6 py-3 bg-amber-50 text-amber-600 font-black rounded-2xl text-[10px] uppercase tracking-widest flex items-center gap-2"><Coffee className="h-4 w-4" /> Went Out</button>
-                           ) : !entry.comeBack ? (
-                             <div className="flex gap-2">
-                                <button onClick={() => handleRegisterAction(s.id, 'comeBack', { approved: true })} className="px-5 py-3 bg-green-600 text-white font-black rounded-2xl text-[9px] uppercase tracking-widest">Approved Back</button>
-                                <button onClick={() => handleRegisterAction(s.id, 'comeBack', { approved: false })} className="px-5 py-3 bg-red-600 text-white font-black rounded-2xl text-[9px] uppercase tracking-widest">Unapproved</button>
-                             </div>
-                           ) : null}
-                         </>
-                       ) : (
-                         <button onClick={() => handleRegisterAction(s.id, 'signIn')} className="px-6 py-3 bg-slate-100 text-slate-400 font-black rounded-2xl text-[10px] uppercase tracking-widest">Mark Present</button>
-                       )}
-                       
-                       <div className="flex items-center gap-2 ml-4">
-                          <input 
-                            type="number" 
-                            className="w-16 p-2 bg-slate-50 border border-slate-200 rounded-xl font-black text-xs text-center" 
-                            placeholder="+OT" 
-                            onBlur={(e) => handleRegisterAction(s.id, 'overtime', { minutes: e.target.value })}
-                          />
-                          <span className="text-[8px] font-black text-slate-300 uppercase">Mins</span>
-                       </div>
-                    </div>
-                 </div>
-               );
+            {eligibleStaff.map(staff => {
+              const rec = attendance.find(r => r.staffId === staff.id);
+              return (
+                <DailyStaffCard 
+                  key={staff.id} 
+                  staff={staff} 
+                  record={rec} 
+                  onAction={(action, approved) => handleAction(staff.id, action, approved)} 
+                  onSaveOvertime={(mins) => handleSaveOvertime(staff.id, mins)}
+                />
+              );
             })}
           </div>
         </div>
-      )}
-
-      {activeTab === 'monthly' && (
-        <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden animate-in fade-in duration-500">
-           <table className="w-full text-left">
-              <thead className="bg-slate-50/50">
-                 <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                    <th className="px-10 py-6">Staff Member</th>
-                    <th className="px-10 py-6">Exp. Hours</th>
-                    <th className="px-10 py-6">Actual Hours</th>
-                    <th className="px-10 py-6">Late/Penalty</th>
-                    <th className="px-10 py-6 text-right">Performance</th>
-                 </tr>
+      ) : (
+        <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <tr>
+                  <th className="px-8 py-6">Staff Member</th>
+                  <th className="px-8 py-6">Contact</th>
+                  <th className="px-8 py-6 text-center">Expected (Hr)</th>
+                  <th className="px-8 py-6 text-center">Actual (Hr)</th>
+                  <th className="px-8 py-6 text-center">Penalty (Min)</th>
+                  <th className="px-8 py-6 text-right">Performance</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                 {staffSummary.map(s => {
-                    const perf = (parseFloat(s.actualHours) / parseFloat(s.expectedHours) * 100) || 0;
-                    return (
-                       <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-10 py-8">
-                             <p className="font-black text-slate-900 uppercase tracking-tight">{s.username}</p>
-                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{s.position}</p>
-                          </td>
-                          <td className="px-10 py-8 font-black text-slate-500">{s.expectedHours}h</td>
-                          <td className="px-10 py-8 font-black text-blue-600">{s.actualHours}h</td>
-                          <td className="px-10 py-8">
-                             <div className="flex items-center gap-2 text-red-600 font-black">
-                                <AlertTriangle className="h-3 w-3" /> {s.lateTally}m
-                             </div>
-                          </td>
-                          <td className="px-10 py-8 text-right">
-                             <div className="flex items-center justify-end gap-4">
-                                <div className="w-24 h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                                   <div className={`h-full rounded-full ${perf > 90 ? 'bg-green-500' : perf > 70 ? 'bg-blue-500' : 'bg-red-500'}`} style={{ width: `${Math.min(perf, 100)}%` }} />
-                                </div>
-                                <span className="text-xs font-black text-slate-900">{Math.round(perf)}%</span>
-                             </div>
-                          </td>
-                       </tr>
-                    );
-                 })}
+                {monthlyStats.map(({ staff, expectedHours, actualHours, penaltyMinutes }) => (
+                  <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black">{staff.fullName.charAt(0)}</div>
+                        <span className="font-black text-slate-900">{staff.fullName}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-slate-500 font-bold text-sm">{staff.phone}</td>
+                    <td className="px-8 py-6 text-center font-black text-slate-700">{expectedHours}</td>
+                    <td className="px-8 py-6 text-center font-black text-indigo-600">{actualHours}</td>
+                    <td className="px-8 py-6 text-center font-black text-red-500">{penaltyMinutes}</td>
+                    <td className="px-8 py-6 text-right">
+                       <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${Number(actualHours) >= Number(expectedHours) ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                         {Number(actualHours) >= Number(expectedHours) ? 'Excellent' : 'Deficit'}
+                       </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
-           </table>
-        </div>
-      )}
-
-      {activeTab === 'library' && (
-        <div className="animate-in fade-in duration-500">
-          <div className="mb-8 flex justify-between items-center no-print">
-             <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Available Shifts</h2>
-             <button onClick={() => setShowShiftModal(true)} className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-xl shadow-blue-100">
-                <Plus className="h-4 w-4" /> Add Shift Type
-             </button>
+            </table>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {/* Safety Fix 3: Ensure we map over shiftLibrary safely */}
-             {(userShop.shiftLibrary || []).map(shift => (
-                <div key={shift.id} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm relative group hover:border-blue-200 transition-all">
-                   <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl w-fit mb-6">
-                      <Clock className="h-7 w-7" />
-                   </div>
-                   <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tight mb-2">{shift.name}</h3>
-                   <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.2em] mb-6">{shift.durationHours} Hours Duration</p>
-                   
-                   <div className="bg-slate-50 p-6 rounded-3xl flex justify-between items-center">
-                      <div>
-                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Start</p>
-                         <p className="text-lg font-black text-slate-900">{shift.startTime}</p>
-                      </div>
-                      <div className="h-8 w-px bg-slate-200" />
-                      <div className="text-right">
-                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">End</p>
-                         <p className="text-lg font-black text-slate-900">{shift.endTime}</p>
-                      </div>
-                   </div>
-
-                   <button 
-                     onClick={() => onUpdateShop(userShop.id, { shiftLibrary: (userShop.shiftLibrary || []).filter(s => s.id !== shift.id) })}
-                     className="absolute top-6 right-6 p-3 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                   >
-                      <Trash2 className="h-5 w-5" />
-                   </button>
-                </div>
-             ))}
-          </div>
-        </div>
-      )}
-
-      {/* New Shift Modal */}
-      {showShiftModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-           <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95">
-              <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center">
-                 <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">Create Shift</h2>
-                 <button onClick={() => setShowShiftModal(false)} className="p-2 bg-white border border-slate-100 rounded-full"><X className="h-5 w-5" /></button>
-              </div>
-              <div className="p-10 space-y-6">
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Shift Variant Name</label>
-                    <input className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-lg outline-none focus:border-blue-600" placeholder="e.g. Morning 8h, Night 12h" value={newShift.name} onChange={e => setNewShift({...newShift, name: e.target.value})} />
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Clock In</label>
-                       <input type="time" className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-lg outline-none" value={newShift.startTime} onChange={e => setNewShift({...newShift, startTime: e.target.value})} />
-                    </div>
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Clock Out</label>
-                       <input type="time" className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-lg outline-none" value={newShift.endTime} onChange={e => setNewShift({...newShift, endTime: e.target.value})} />
-                    </div>
-                 </div>
-                 <button onClick={handleAddShift} className="w-full py-6 bg-blue-600 text-white font-black rounded-[24px] shadow-xl shadow-blue-100 uppercase tracking-widest text-sm mt-4">Save to Library</button>
-              </div>
-           </div>
-        </div>
-      )}
-
-      {/* Init Register Modal */}
-      {showInitModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden p-10 animate-in zoom-in-95">
-              <div className="text-center mb-8">
-                 <div className="p-6 bg-blue-50 text-blue-600 rounded-[32px] w-fit mx-auto mb-6 shadow-inner">
-                    <ClipboardList className="h-12 w-12" />
-                 </div>
-                 <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-tight">Initialize Register</h2>
-                 <p className="text-slate-400 font-bold mt-2 uppercase tracking-widest text-xs">For Month: {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-4">
-                 <button onClick={() => { setShowInitModal(false); alert("Fresh Register Active!"); }} className="p-8 bg-slate-50 border-2 border-transparent rounded-[32px] text-left hover:border-blue-600 hover:bg-blue-50 transition-all group">
-                    <h3 className="font-black text-xl text-slate-900 uppercase tracking-tight group-hover:text-blue-600">Fresh Initialization</h3>
-                    <p className="text-slate-400 font-bold text-xs mt-1">Start a blank register for the new month. No data carry-over.</p>
-                 </button>
-                 <button onClick={() => { setShowInitModal(false); alert("Continuation Active!"); }} className="p-8 bg-slate-50 border-2 border-transparent rounded-[32px] text-left hover:border-blue-600 hover:bg-blue-50 transition-all group">
-                    <h3 className="font-black text-xl text-slate-900 uppercase tracking-tight group-hover:text-blue-600">Re-register Continuation</h3>
-                    <p className="text-slate-400 font-bold text-xs mt-1">Pull staff from previous month and keep running totals.</p>
-                 </button>
-              </div>
-              <button onClick={() => setShowInitModal(false)} className="w-full py-5 text-slate-400 font-black uppercase tracking-widest text-[10px] mt-6">Cancel Operation</button>
-           </div>
         </div>
       )}
     </Layout>
+  );
+};
+
+const DailyStaffCard: React.FC<{ 
+  staff: Staff, 
+  record?: AttendanceRecord, 
+  onAction: (a: 'in' | 'out' | 'break_start' | 'break_end' | 'absent', approved?: boolean) => void,
+  onSaveOvertime: (mins: number) => void
+}> = ({ staff, record, onAction, onSaveOvertime }) => {
+  const [ot, setOt] = useState(record?.overtimeMinutes || 0);
+  const [showBreakDialog, setShowBreakDialog] = useState(false);
+
+  const statusColors: any = {
+    'Present': 'bg-green-500',
+    'Absent': 'bg-red-500',
+    'On Break': 'bg-orange-500',
+    'Sign Out': 'bg-slate-400'
+  };
+
+  return (
+    <div className="p-8 bg-white border-2 border-transparent rounded-[32px] shadow-sm hover:border-blue-100 transition-all">
+      <div className="flex flex-col xl:flex-row gap-8 justify-between">
+        <div className="flex items-start gap-6">
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center font-black text-xl border">
+            {staff.fullName.charAt(0)}
+          </div>
+          <div>
+            <h4 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">{staff.fullName}</h4>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">{staff.phone} • {staff.position}</p>
+            <div className="flex items-center gap-2 mt-4">
+              <div className={`w-2 h-2 rounded-full ${statusColors[record?.status || ''] || 'bg-slate-200'}`} />
+              <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{record?.status || 'NOT SIGNED IN'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col md:flex-row items-center gap-6 justify-end">
+          {!record || record.status === 'Absent' ? (
+            <div className="flex gap-2">
+              <button onClick={() => onAction('in')} className="px-6 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg shadow-green-100 text-xs uppercase tracking-widest flex items-center gap-2"><Check className="h-4 w-4" /> Sign In</button>
+              <button onClick={() => onAction('absent')} className="px-6 py-4 bg-red-50 text-red-600 border-2 border-red-100 font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2"><X className="h-4 w-4" /> Absent</button>
+            </div>
+          ) : (
+            <>
+              {record.status !== 'Sign Out' && (
+                <div className="flex gap-2">
+                  {record.status === 'On Break' ? (
+                    <div className="flex gap-2 animate-in fade-in zoom-in">
+                       <button onClick={() => onAction('break_end', true)} className="px-4 py-3 bg-green-50 text-green-600 border-2 border-green-100 font-black rounded-xl text-[10px] uppercase">Approved End</button>
+                       <button onClick={() => onAction('break_end', false)} className="px-4 py-3 bg-orange-50 text-orange-600 border-2 border-orange-100 font-black rounded-xl text-[10px] uppercase">Unapproved End</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => onAction('break_start')} className="px-6 py-4 bg-orange-50 text-orange-600 font-black rounded-2xl border-2 border-orange-100 text-xs uppercase tracking-widest flex items-center gap-2"><Coffee className="h-4 w-4" /> Went Out</button>
+                  )}
+                  <button onClick={() => onAction('out')} className="px-6 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center gap-2">Sign Out</button>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl">
+                 <input type="number" className="w-16 p-3 bg-white border-2 rounded-xl font-black text-center text-xs outline-none" value={ot} onChange={e => setOt(Number(e.target.value))} />
+                 <p className="text-[10px] font-black text-slate-400 uppercase">Min OT</p>
+                 <button onClick={() => onSaveOvertime(ot)} className="p-3 bg-blue-600 text-white rounded-xl shadow-lg"><Save className="h-4 w-4" /></button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 
