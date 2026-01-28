@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Lock, Users, Save, X, Plus, Trash2, Calendar, UserPlus, ChevronRight, Check, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import Layout from '../components/Layout';
-import { AppState, Shop, BusinessHour, BusinessDay, Staff } from '../types';
-import { DAYS } from '../constants';
+
+// FIX: Updated imports for flat structure (no more ../ or folders)
+import Layout from './Layout';
+import { AppState, Shop, BusinessHour, BusinessDay, Staff } from './types';
+import { DAYS } from './constants';
 
 interface SettingsPageProps {
   state: AppState;
@@ -19,7 +21,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
   const userShop = (shops || []).find(s => s.id === currentUser?.shopId);
   const navigate = useNavigate();
 
-  // Changed 'username' to 'fullName' and added 'phone' to match Staff interface
+  // Updated 'fullName' and added 'phone' to match your latest requirements
   const [newStaff, setNewStaff] = useState({ fullName: '', phone: '', password: '', canAddItems: true });
   const [tempHours, setTempHours] = useState<BusinessHour[]>(userShop?.businessHours || []);
   const [isAuto, setIsAuto] = useState(userShop?.isAutomatic || false);
@@ -85,7 +87,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
   };
 
   const handleAddStaff = () => {
-    // Corrected check and Staff object literal to use 'fullName' and include required properties
     if (!newStaff.fullName || !newStaff.password || !userShop) return;
     const staff: Staff = { 
       id: Math.random().toString(36).substr(2, 9), 
@@ -273,7 +274,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
                 {(userShop.staff || []).map(member => (
                   <div key={member.id} className="flex items-center justify-between p-4 bg-white border rounded-xl">
                     <div className="flex-1">
-                      {/* Fixed: Use 'fullName' instead of 'username' */}
                       <span className="font-bold text-base text-gray-800 block">{member.fullName}</span>
                       <span className="text-[10px] font-bold text-gray-400 uppercase">PWD: {member.password}</span>
                     </div>
@@ -302,7 +302,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 md:p-8">
             <h2 className="text-2xl font-black text-gray-900 mb-6">Add New Staff</h2>
             <div className="space-y-4">
-              {/* Corrected: Using 'fullName' and 'phone' fields */}
               <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Full Name" value={newStaff.fullName} onChange={e => setNewStaff({ ...newStaff, fullName: e.target.value })} />
               <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Phone Number" value={newStaff.phone} onChange={e => setNewStaff({ ...newStaff, phone: e.target.value })} />
               <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Password" value={newStaff.password} onChange={e => setNewStaff({ ...newStaff, password: e.target.value })} />
