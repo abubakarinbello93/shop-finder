@@ -191,6 +191,62 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
         ))}
       </div>
 
+      {/* Facility Schedule Modal */}
+      {activeModal === 'hours' && userShop && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Facility Schedule</h2>
+              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-8 overflow-y-auto flex-1">
+              <div className={`p-6 rounded-2xl mb-8 text-white flex items-center justify-between transition-all ${isAuto ? 'bg-blue-600' : 'bg-gray-400'}`}>
+                <div>
+                  <h4 className="font-black text-xl leading-none">Automatic Control</h4>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mt-2 text-white/80">Opens/Closes based on hours</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" checked={isAuto} onChange={e => setIsAuto(e.target.checked)} />
+                  <div className={`w-14 h-8 bg-white/20 rounded-full flex items-center transition-all px-1 ${isAuto ? 'justify-end' : 'justify-start'}`}>
+                    <div className="h-6 w-6 rounded-full bg-white flex items-center justify-center shadow-sm">
+                      {isAuto ? <Check className="h-3 w-3 text-blue-600" /> : <X className="h-3 w-3 text-gray-400" />}
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r font-bold text-xs flex gap-2"><AlertCircle className="h-4 w-4" />{error}</div>}
+              
+              <div className="space-y-4">
+                {tempHours.map(bh => (
+                  <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-4 p-5 rounded-2xl border bg-gray-50/50 group hover:border-blue-100 transition-all">
+                    <span className="font-black text-base text-gray-800 flex-1 uppercase tracking-tight">{bh.day}</span>
+                    <div className="flex items-center gap-3">
+                      <input type="time" value={bh.open} onChange={e => handleUpdateHours(bh.id, { open: e.target.value })} className="p-3 rounded-xl border-2 font-black text-sm outline-none focus:border-blue-600" />
+                      <span className="font-bold text-gray-400 uppercase text-[10px]">TO</span>
+                      <input type="time" value={bh.close} onChange={e => handleUpdateHours(bh.id, { close: e.target.value })} className="p-3 rounded-xl border-2 font-black text-sm outline-none focus:border-blue-600" />
+                      <button onClick={() => handleRemoveHour(bh.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="flex gap-3 mt-8 p-6 border-4 border-dashed border-gray-100 rounded-[32px] bg-white">
+                  <select className="flex-1 p-4 bg-gray-50 border-none rounded-xl font-black text-sm outline-none" value={dayToAdd} onChange={e => setDayToAdd(e.target.value as BusinessDay)}>
+                    <option value="">Select a day...</option>
+                    {availableDays.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <button onClick={handleAddDay} disabled={!dayToAdd} className="px-8 py-4 bg-blue-100 text-blue-600 rounded-xl font-black text-xs uppercase tracking-widest disabled:opacity-30">Add Day</button>
+                </div>
+              </div>
+            </div>
+            <div className="p-8 border-t bg-gray-50 flex justify-end gap-4">
+              <button onClick={() => setActiveModal(null)} className="px-6 py-4 font-black text-gray-500 text-sm uppercase tracking-widest">Cancel</button>
+              <button onClick={handleSaveHours} className="px-10 py-4 bg-blue-600 text-white font-black rounded-xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm">Save Schedule</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Password Modal */}
       {activeModal === 'password' && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
@@ -333,7 +389,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
                   <div>
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] border-b pb-2 mb-4">Shift Eligibility</h4>
                     <div className="flex flex-wrap gap-2">
-                      {userShop?.shifts?.map(shift => (
+                      {(userShop?.shifts || []).map(shift => (
                         <button 
                           key={shift.id}
                           onClick={() => {
