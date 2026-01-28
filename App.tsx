@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc, where, orderBy, limit, writeBatch } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
+// Using @firebase/auth directly to resolve export member errors in some environments
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from '@firebase/auth';
 import { auth, db } from './firebase';
 import { User, Shop, AppState, HistoryItem, Comment, BusinessHour, Staff } from './types';
 import { MOCK_SHOPS } from './constants';
@@ -401,7 +403,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center flex-col gap-4">
         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="font-black text-blue-600 uppercase tracking-widest text-sm">Initializing Openshop...</p>
+        <p className="font-black text-blue-600 uppercase tracking-widest text-sm">Initializing Shop Finder...</p>
       </div>
     );
   }
