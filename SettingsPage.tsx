@@ -1,10 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Lock, Users, Save, X, Plus, Trash2, Calendar, UserPlus, ChevronRight, Check, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
-
-// FIX: Updated imports for flat structure (no more ../ or folders)
+import { Clock, Lock, Users, Save, X, Plus, Trash2, Calendar, UserPlus, ChevronRight, Check, ArrowLeft, AlertCircle, Eye, EyeOff, LayoutList } from 'lucide-react';
 import Layout from './Layout';
-import { AppState, Shop, BusinessHour, BusinessDay, Staff } from './types';
+import { AppState, Shop, BusinessHour, BusinessDay, Staff, Shift, StaffPermissions } from './types';
 import { DAYS } from './constants';
 
 interface SettingsPageProps {
@@ -14,20 +12,39 @@ interface SettingsPageProps {
   onUpdatePassword: (newPassword: string) => void;
 }
 
+const generateStaffCode = () => {
+  const nums = Math.floor(1000 + Math.random() * 8999).toString();
+  const letters = Array.from({ length: 2 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+  return `${nums}${letters}`;
+};
+
 const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateShop, onUpdatePassword }) => {
-  const [activeModal, setActiveModal] = useState<'password' | 'staff' | 'addStaff' | 'hours' | null>(null);
+  const [activeModal, setActiveModal] = useState<'password' | 'staff' | 'addStaff' | 'hours' | 'shifts' | null>(null);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { currentUser, shops } = state;
   const userShop = (shops || []).find(s => s.id === currentUser?.shopId);
   const navigate = useNavigate();
 
-  // Updated 'fullName' and added 'phone' to match your latest requirements
-  const [newStaff, setNewStaff] = useState({ fullName: '', phone: '', password: '', canAddItems: true });
+  // Modal specific states
+  const [newStaff, setNewStaff] = useState<Partial<Staff>>({ 
+    fullName: '', 
+    phone: '', 
+    password: '', 
+    position: '',
+    eligibleShifts: [],
+    permissions: {
+      editInventory: false,
+      seeStaffOnDuty: false,
+      registerManagement: false,
+      statusControl: false
+    }
+  });
+
+  const [newShift, setNewShift] = useState({ name: '', start: '09:00', end: '17:00' });
   const [tempHours, setTempHours] = useState<BusinessHour[]>(userShop?.businessHours || []);
   const [isAuto, setIsAuto] = useState(userShop?.isAutomatic || false);
   const [dayToAdd, setDayToAdd] = useState<BusinessDay | ''>('');
-
-  // Password change state
   const [pwdForm, setPwdForm] = useState({ current: '', new: '', confirm: '', show: false });
 
   const isOwner = userShop && userShop.ownerId === currentUser?.id;
@@ -35,20 +52,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
   const availableDays = useMemo(() => {
     return (DAYS as BusinessDay[]).filter(d => !tempHours.some(h => h.day === d));
   }, [tempHours]);
-
-  const validateOverlaps = (hours: BusinessHour[]): string | null => {
-    for (const day of DAYS as BusinessDay[]) {
-      const daySlots = hours.filter(h => h.day === day && h.enabled);
-      if (daySlots.length < 2) continue;
-      const sorted = [...daySlots].sort((a, b) => a.open.localeCompare(b.open));
-      for (let i = 0; i < sorted.length - 1; i++) {
-        if (sorted[i].close > sorted[i + 1].open) {
-          return `Overlap on ${day}! ${sorted[i].open}-${sorted[i].close} overlaps ${sorted[i+1].open}.`;
-        }
-      }
-    }
-    return null;
-  };
 
   const handleUpdateHours = (id: string, updates: Partial<BusinessHour>) => {
     setTempHours(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
@@ -74,39 +77,62 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
 
   const handleSaveHours = () => {
     if (!userShop) return;
-    const overlapErr = validateOverlaps(tempHours);
-    if (overlapErr) { setError(overlapErr); return; }
     onUpdateShop(userShop.id, { businessHours: tempHours, isAutomatic: isAuto });
     setActiveModal(null);
   };
 
-  const handleUpdateStaff = (id: string, updates: Partial<Staff>) => {
-    if (!userShop) return;
-    const staff = userShop.staff.map(s => s.id === id ? { ...s, ...updates } : s);
-    onUpdateShop(userShop.id, { staff });
+  const handleAddStaff = () => {
+    if (!newStaff.fullName || !newStaff.phone || !newStaff.password || !userShop) {
+      alert("All mandatory fields (*) are required.");
+      return;
+    }
+    if ((newStaff.password?.length || 0) < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+
+    const staff: Staff = { 
+      id: editingStaff?.id || Math.random().toString(36).substr(2, 9), 
+      fullName: newStaff.fullName!,
+      phone: newStaff.phone!,
+      password: newStaff.password!,
+      code: editingStaff?.code || generateStaffCode(),
+      position: newStaff.position || 'Staff',
+      eligibleShifts: newStaff.eligibleShifts || [],
+      permissions: newStaff.permissions!
+    };
+
+    let updatedStaffList;
+    if (editingStaff) {
+      updatedStaffList = userShop.staff.map(s => s.id === editingStaff.id ? staff : s);
+    } else {
+      updatedStaffList = [...(userShop.staff || []), staff];
+    }
+
+    onUpdateShop(userShop.id, { staff: updatedStaffList });
+    setNewStaff({ 
+      fullName: '', phone: '', password: '', position: '', eligibleShifts: [], 
+      permissions: { editInventory: false, seeStaffOnDuty: false, registerManagement: false, statusControl: false } 
+    });
+    setEditingStaff(null);
+    setActiveModal('staff');
   };
 
-  const handleAddStaff = () => {
-    if (!newStaff.fullName || !newStaff.password || !userShop) return;
-    const staff: Staff = { 
+  const handleAddShift = () => {
+    if (!newShift.name || !userShop) return;
+    const shift: Shift = { 
       id: Math.random().toString(36).substr(2, 9), 
-      fullName: newStaff.fullName, 
-      phone: newStaff.phone || '',
-      password: newStaff.password,
-      code: Math.random().toString(36).substr(2, 6).toUpperCase(),
-      position: 'Staff',
-      eligibleShifts: [],
-      permissions: {
-        editInventory: newStaff.canAddItems,
-        seeStaffOnDuty: false,
-        registerManagement: false,
-        statusControl: false
-      },
-      canAddItems: newStaff.canAddItems
+      name: newShift.name, 
+      start: newShift.start, 
+      end: newShift.end 
     };
-    onUpdateShop(userShop.id, { staff: [...(userShop.staff || []), staff] });
-    setNewStaff({ fullName: '', phone: '', password: '', canAddItems: true });
-    setActiveModal('staff');
+    onUpdateShop(userShop.id, { shifts: [...(userShop.shifts || []), shift] });
+    setNewShift({ name: '', start: '09:00', end: '17:00' });
+  };
+
+  const handleRemoveShift = (id: string) => {
+    if (!userShop) return;
+    onUpdateShop(userShop.id, { shifts: userShop.shifts.filter(s => s.id !== id) });
   };
 
   const handlePasswordChange = () => {
@@ -118,8 +144,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       setError("Incorrect current password.");
       return;
     }
-    if (pwdForm.new.length < 4) {
-      setError("Password too short (min 4 characters).");
+    if (pwdForm.new.length < 6) {
+      setError("Password too short (min 6 characters).");
       return;
     }
     onUpdatePassword(pwdForm.new);
@@ -130,189 +156,206 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
   };
 
   const menuItems = [
-    { title: 'Change Password', desc: 'Update account security', icon: Lock, action: () => { setError(null); setActiveModal('password'); } },
+    { title: 'Security', desc: 'Manage your password', icon: Lock, action: () => { setError(null); setActiveModal('password'); } },
   ];
 
   if (userShop) {
-    menuItems.unshift({ title: 'Business Hour', desc: 'Opening/Closing schedule', icon: Clock, action: () => { setTempHours(userShop.businessHours || []); setIsAuto(userShop.isAutomatic); setActiveModal('hours'); } });
+    menuItems.unshift({ title: 'Shift Library', desc: 'Create global work shifts', icon: LayoutList, action: () => setActiveModal('shifts') });
+    menuItems.unshift({ title: 'Facility Schedule', desc: 'Set your hours & auto-mode', icon: Clock, action: () => { setTempHours(userShop.businessHours || []); setIsAuto(userShop.isAutomatic); setActiveModal('hours'); } });
     if (isOwner) {
-      menuItems.push({ title: 'Staff Management', desc: 'Permissions and accounts', icon: Users, action: () => setActiveModal('staff') });
+      menuItems.push({ title: 'Team Management', desc: 'Staff roles & eligibility', icon: Users, action: () => setActiveModal('staff') });
     }
   }
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout}>
       <div className="mb-8">
-        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-2 hover:gap-3 transition-all"><ArrowLeft className="h-5 w-5" /> Back</button>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Settings</h1>
+        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-2 hover:gap-3 transition-all">
+          <ArrowLeft className="h-5 w-5" /> Back to Dashboard
+        </button>
+        <h1 className="text-3xl font-black text-gray-900 tracking-tight">App Settings</h1>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+      <div className="bg-white rounded-[32px] shadow-sm border overflow-hidden">
         {menuItems.map((item, idx) => (
-          <button key={idx} onClick={item.action} className="w-full flex items-center p-6 hover:bg-gray-50 transition-colors border-b last:border-0 group">
-            <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4 group-hover:scale-105 transition-transform"><item.icon className="h-6 w-6" /></div>
-            <div className="text-left flex-1">
-              <h3 className="font-black text-gray-900 text-lg tracking-tight">{item.title}</h3>
-              <p className="text-gray-500 font-bold text-sm">{item.desc}</p>
+          <button key={idx} onClick={item.action} className="w-full flex items-center p-8 hover:bg-gray-50 transition-colors border-b last:border-0 group">
+            <div className="p-4 bg-blue-100 text-blue-600 rounded-2xl mr-6 group-hover:scale-110 transition-transform">
+              <item.icon className="h-6 w-6" />
             </div>
-            <ChevronRight className="h-6 w-6 text-gray-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+            <div className="text-left flex-1">
+              <h3 className="font-black text-gray-900 text-xl tracking-tight leading-tight">{item.title}</h3>
+              <p className="text-gray-500 font-bold text-sm mt-1">{item.desc}</p>
+            </div>
+            <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-2 transition-all" />
           </button>
         ))}
       </div>
 
+      {/* Password Modal */}
       {activeModal === 'password' && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 md:p-8">
+          <div className="bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden p-8">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Password</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-gray-50 border rounded-full"><X className="h-5 w-5" /></button>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Security</h2>
+              <button onClick={() => setActiveModal(null)} className="p-2 bg-gray-50 border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
             </div>
-            
-            {error && <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r font-bold text-xs flex gap-2"><AlertCircle className="shrink-0 h-4 w-4" />{error}</div>}
-
+            {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r font-bold text-xs flex gap-2"><AlertCircle className="shrink-0 h-4 w-4" />{error}</div>}
             <div className="space-y-4">
-              <div className="relative group">
-                <input 
-                  type={pwdForm.show ? "text" : "password"}
-                  className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-500 outline-none pr-12 text-sm" 
-                  placeholder="Current Password" 
-                  value={pwdForm.current} 
-                  onChange={e => setPwdForm({ ...pwdForm, current: e.target.value })} 
-                />
-                <button 
-                  onClick={() => setPwdForm({ ...pwdForm, show: !pwdForm.show })}
-                  className="absolute right-4 top-4 text-gray-400 hover:text-blue-600 transition-colors"
-                >
-                  {pwdForm.show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-
-              <input 
-                type={pwdForm.show ? "text" : "password"}
-                className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-500 outline-none text-sm" 
-                placeholder="New Password" 
-                value={pwdForm.new} 
-                onChange={e => setPwdForm({ ...pwdForm, new: e.target.value })} 
-              />
-
-              <input 
-                type={pwdForm.show ? "text" : "password"}
-                className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-500 outline-none text-sm" 
-                placeholder="Confirm New Password" 
-                value={pwdForm.confirm} 
-                onChange={e => setPwdForm({ ...pwdForm, confirm: e.target.value })} 
-              />
-
-              <div className="flex gap-4 mt-6">
-                <button onClick={() => setActiveModal(null)} className="flex-1 py-3 font-black text-gray-500 text-sm">Cancel</button>
-                <button onClick={handlePasswordChange} className="flex-[2] py-3 bg-blue-600 text-white font-black rounded-xl shadow-lg text-sm shadow-blue-100">Update</button>
+              <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-600 outline-none" placeholder="Current Password" value={pwdForm.current} onChange={e => setPwdForm({ ...pwdForm, current: e.target.value })} />
+              <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-600 outline-none" placeholder="New Password" value={pwdForm.new} onChange={e => setPwdForm({ ...pwdForm, new: e.target.value })} />
+              <input type={pwdForm.show ? "text" : "password"} className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold focus:border-blue-600 outline-none" placeholder="Confirm New Password" value={pwdForm.confirm} onChange={e => setPwdForm({ ...pwdForm, confirm: e.target.value })} />
+              <div className="flex gap-4 mt-8">
+                <button onClick={() => setActiveModal(null)} className="flex-1 py-4 font-black text-gray-500 text-sm uppercase tracking-widest">Cancel</button>
+                <button onClick={handlePasswordChange} className="flex-[2] py-4 bg-blue-600 text-white font-black rounded-xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm">Update Password</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {activeModal === 'hours' && userShop && (
+      {/* Shift Library Modal */}
+      {activeModal === 'shifts' && userShop && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Business Hour</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full"><X className="h-5 w-5" /></button>
+          <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Shift Library</h2>
+              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1">
-              <div className={`p-4 rounded-xl mb-6 text-white flex items-center justify-between transition-colors ${isAuto ? 'bg-blue-600' : 'bg-gray-400'}`}>
-                <div><h4 className="font-black text-lg">Automatic Mode</h4></div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={isAuto} onChange={e => setIsAuto(e.target.checked)} />
-                  <div className={`w-14 h-8 bg-white/20 rounded-full flex items-center transition-all px-1 ${isAuto ? 'justify-end' : 'justify-start'}`}>
-                    <div className="h-6 w-6 rounded-full bg-white flex items-center justify-center">
-                      {!isAuto && <span className="text-[8px] font-black text-gray-400 uppercase">off</span>}
-                    </div>
-                  </div>
-                </label>
+            <div className="p-8 overflow-y-auto flex-1">
+              <div className="mb-10 bg-blue-50 p-6 rounded-3xl border-2 border-dashed border-blue-200">
+                <h4 className="font-black text-blue-900 mb-4 uppercase tracking-widest text-xs">Create New Shift Definition</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <input className="p-4 bg-white border-2 rounded-xl font-bold text-sm" placeholder="Shift Name (e.g. Morning)" value={newShift.name} onChange={e => setNewShift({...newShift, name: e.target.value})} />
+                  <input type="time" className="p-4 bg-white border-2 rounded-xl font-bold text-sm" value={newShift.start} onChange={e => setNewShift({...newShift, start: e.target.value})} />
+                  <input type="time" className="p-4 bg-white border-2 rounded-xl font-bold text-sm" value={newShift.end} onChange={e => setNewShift({...newShift, end: e.target.value})} />
+                </div>
+                <button onClick={handleAddShift} className="w-full mt-4 py-4 bg-blue-600 text-white font-black rounded-xl shadow-lg shadow-blue-100 uppercase tracking-widest text-xs">Add to Library</button>
               </div>
-              {error && <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r font-bold text-xs flex gap-2"><AlertCircle className="h-4 w-4" />{error}</div>}
+
               <div className="space-y-3">
-                {tempHours.map(bh => (
-                  <div key={bh.id} className="flex flex-col md:flex-row md:items-center gap-3 p-4 rounded-xl border bg-gray-50/50">
-                    <span className="font-black text-base text-gray-800 flex-1">{bh.day}</span>
-                    <div className="flex items-center gap-2">
-                      <input type="time" value={bh.open} onChange={e => handleUpdateHours(bh.id, { open: e.target.value })} className="p-2 rounded-lg border font-bold text-sm" />
-                      <span className="font-bold text-gray-400">to</span>
-                      <input type="time" value={bh.close} onChange={e => handleUpdateHours(bh.id, { close: e.target.value })} className="p-2 rounded-lg border font-bold text-sm" />
-                      <button onClick={() => handleRemoveHour(bh.id)} className="p-2 text-red-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                {(userShop.shifts || []).map(s => (
+                  <div key={s.id} className="flex items-center justify-between p-5 bg-white border-2 rounded-2xl group hover:border-blue-100 transition-all">
+                    <div>
+                      <p className="font-black text-slate-900 uppercase tracking-tight">{s.name}</p>
+                      <p className="text-xs font-bold text-slate-400">{s.start} - {s.end}</p>
+                    </div>
+                    <button onClick={() => handleRemoveShift(s.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="h-5 w-5" /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Management Modal */}
+      {activeModal === 'staff' && userShop && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b bg-gray-50/50 flex justify-between items-center">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Team Management</h2>
+              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-8 overflow-y-auto flex-1">
+              <button onClick={() => { setEditingStaff(null); setNewStaff({ fullName:'', phone:'', password:'', position:'', eligibleShifts:[], permissions:{editInventory:false, seeStaffOnDuty:false, registerManagement:false, statusControl:false} }); setActiveModal('addStaff'); }} className="w-full mb-8 p-6 bg-blue-50 border-4 border-dashed border-blue-100 rounded-[32px] text-blue-600 font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-100 transition-all">
+                <UserPlus className="h-6 w-6" /> Add Team Member
+              </button>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(userShop.staff || []).map(member => (
+                  <div key={member.id} className="p-6 bg-white border-2 rounded-3xl shadow-sm hover:border-blue-100 transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-black text-xl text-slate-900 leading-tight">{member.fullName}</h4>
+                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">CODE: {member.code}</p>
+                        </div>
+                        <span className="bg-slate-50 px-3 py-1 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest border">{member.position}</span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-500">Phone: {member.phone}</p>
+                    </div>
+                    <div className="flex gap-2 mt-6 pt-6 border-t border-slate-50">
+                      <button onClick={() => { setEditingStaff(member); setNewStaff(member); setActiveModal('addStaff'); }} className="flex-1 py-3 bg-slate-50 text-slate-600 font-black rounded-xl text-xs uppercase tracking-widest">Edit Profile</button>
+                      <button onClick={() => onUpdateShop(userShop.id, { staff: userShop.staff.filter(s => s.id !== member.id) })} className="p-3 text-red-400 hover:bg-red-50 rounded-xl"><Trash2 className="h-5 w-5" /></button>
                     </div>
                   </div>
                 ))}
-                <div className="flex gap-2 mt-4 p-4 border-2 border-dashed border-gray-200 rounded-xl">
-                  <select className="flex-1 p-2 bg-gray-50 border-none rounded-lg font-bold text-sm" value={dayToAdd} onChange={e => setDayToAdd(e.target.value as BusinessDay)}>
-                    <option value="">Select a day...</option>
-                    {availableDays.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <button onClick={handleAddDay} disabled={!dayToAdd} className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg font-black text-xs disabled:opacity-50">Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Staff Detail Modal */}
+      {activeModal === 'addStaff' && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+            <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
+              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{editingStaff ? 'Update Member' : 'Register Member'}</h2>
+              <button onClick={() => setActiveModal('staff')} className="p-2 bg-white border rounded-full"><X className="h-5 w-5" /></button>
+            </div>
+            
+            <div className="p-10 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="space-y-6">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] border-b pb-2">Identity & Auth</h4>
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Full Name *</label>
+                      <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl font-black text-sm outline-none focus:border-blue-600" placeholder="Ex: John Doe" value={newStaff.fullName} onChange={e => setNewStaff({...newStaff, fullName: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Phone Number * (Login ID)</label>
+                      <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl font-black text-sm outline-none focus:border-blue-600" placeholder="Ex: 08012345678" value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Password * (Min 6)</label>
+                      <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl font-black text-sm outline-none focus:border-blue-600" type="password" placeholder="******" value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Position</label>
+                      <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-xl font-black text-sm outline-none focus:border-blue-600" placeholder="Ex: Sales Manager" value={newStaff.position} onChange={e => setNewStaff({...newStaff, position: e.target.value})} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-8">
+                  <div>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] border-b pb-2 mb-4">Management Permissions</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      <PermissionToggle label="Edit Inventory" active={newStaff.permissions?.editInventory || false} onToggle={() => setNewStaff({...newStaff, permissions: {...newStaff.permissions!, editInventory: !newStaff.permissions?.editInventory}})} />
+                      <PermissionToggle label="See Staff on Duty" active={newStaff.permissions?.seeStaffOnDuty || false} onToggle={() => setNewStaff({...newStaff, permissions: {...newStaff.permissions!, seeStaffOnDuty: !newStaff.permissions?.seeStaffOnDuty}})} />
+                      <PermissionToggle label="Register Management" active={newStaff.permissions?.registerManagement || false} onToggle={() => setNewStaff({...newStaff, permissions: {...newStaff.permissions!, registerManagement: !newStaff.permissions?.registerManagement}})} />
+                      <PermissionToggle label="Open / Close Control" active={newStaff.permissions?.statusControl || false} onToggle={() => setNewStaff({...newStaff, permissions: {...newStaff.permissions!, statusControl: !newStaff.permissions?.statusControl}})} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] border-b pb-2 mb-4">Shift Eligibility</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {userShop?.shifts?.map(shift => (
+                        <button 
+                          key={shift.id}
+                          onClick={() => {
+                            const current = newStaff.eligibleShifts || [];
+                            const updated = current.includes(shift.id) ? current.filter(id => id !== shift.id) : [...current, shift.id];
+                            setNewStaff({...newStaff, eligibleShifts: updated});
+                          }}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${newStaff.eligibleShifts?.includes(shift.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100'}`}
+                        >
+                          {shift.name} ({shift.start}-{shift.end})
+                        </button>
+                      ))}
+                      {(!userShop?.shifts || userShop.shifts.length === 0) && <p className="text-[10px] font-bold text-slate-300 italic">No shifts in library. Create them first.</p>}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => setActiveModal(null)} className="px-4 py-2 font-black text-gray-500 text-sm">Cancel</button>
-              <button onClick={handleSaveHours} className="px-8 py-2 bg-blue-600 text-white font-black rounded-xl shadow-lg text-sm">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {activeModal === 'staff' && userShop && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter">Staff Management</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="p-6 overflow-y-auto">
-              <button onClick={() => setActiveModal('addStaff')} className="w-full mb-6 p-4 bg-blue-50 border-2 border-dashed border-blue-200 rounded-xl text-blue-600 font-black text-lg flex items-center justify-center gap-2"><Plus className="h-5 w-5" /> Add Staff</button>
-              <div className="space-y-3">
-                {(userShop.staff || []).map(member => (
-                  <div key={member.id} className="flex items-center justify-between p-4 bg-white border rounded-xl">
-                    <div className="flex-1">
-                      <span className="font-bold text-base text-gray-800 block">{member.fullName}</span>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">PWD: {member.password}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col items-center">
-                        <label className="text-[8px] font-black uppercase mb-1">Items</label>
-                        <button 
-                          onClick={() => handleUpdateStaff(member.id, { canAddItems: !member.canAddItems })}
-                          className={`w-8 h-5 rounded-full transition-colors flex items-center px-1 ${member.canAddItems ? 'bg-green-500 justify-end' : 'bg-gray-300 justify-start'}`}
-                        >
-                          <div className="w-3 h-3 bg-white rounded-full" />
-                        </button>
-                      </div>
-                      <button onClick={() => onUpdateShop(userShop.id, { staff: userShop.staff.filter(s => s.id !== member.id) })} className="p-2 text-red-400"><Trash2 className="h-4 w-4" /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeModal === 'addStaff' && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 md:p-8">
-            <h2 className="text-2xl font-black text-gray-900 mb-6">Add New Staff</h2>
-            <div className="space-y-4">
-              <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Full Name" value={newStaff.fullName} onChange={e => setNewStaff({ ...newStaff, fullName: e.target.value })} />
-              <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Phone Number" value={newStaff.phone} onChange={e => setNewStaff({ ...newStaff, phone: e.target.value })} />
-              <input className="w-full p-4 bg-gray-50 border-2 rounded-xl font-bold text-sm" placeholder="Password" value={newStaff.password} onChange={e => setNewStaff({ ...newStaff, password: e.target.value })} />
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                 <input type="checkbox" className="w-4 h-4" checked={newStaff.canAddItems} onChange={e => setNewStaff({ ...newStaff, canAddItems: e.target.checked })} />
-                 <span className="font-bold text-sm text-gray-700">Allow Adding Items</span>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setActiveModal('staff')} className="flex-1 py-3 font-black text-gray-500 text-sm">Cancel</button>
-                <button onClick={handleAddStaff} className="flex-[2] py-3 bg-blue-600 text-white font-black rounded-xl shadow-lg text-sm">Save</button>
-              </div>
+            <div className="p-8 border-t bg-gray-50 flex gap-4">
+              <button onClick={() => setActiveModal('staff')} className="flex-1 py-5 font-black text-slate-400 text-sm uppercase tracking-widest">Cancel</button>
+              <button onClick={handleAddStaff} className="flex-[2] py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 uppercase tracking-widest text-sm">{editingStaff ? 'Update Member' : 'Grant Access'}</button>
             </div>
           </div>
         </div>
@@ -320,5 +363,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
     </Layout>
   );
 };
+
+const PermissionToggle: React.FC<{ label: string, active: boolean, onToggle: () => void }> = ({ label, active, onToggle }) => (
+  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer hover:bg-slate-100 transition-all" onClick={onToggle}>
+    <span className="font-black text-[10px] uppercase tracking-widest text-slate-700">{label}</span>
+    <div className={`w-10 h-6 rounded-full transition-all relative flex items-center px-1 ${active ? 'bg-green-500' : 'bg-slate-200'}`}>
+      <div className={`w-4 h-4 bg-white rounded-full shadow transition-all ${active ? 'translate-x-4' : 'translate-x-0'}`} />
+    </div>
+  </div>
+);
 
 export default SettingsPage;
