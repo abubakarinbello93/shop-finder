@@ -78,6 +78,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
     }
   };
 
+  const isOwner = shop && shop.ownerId === user.id;
+  const canSeeDuty = isOwner || user.permissions?.seeStaffOnDuty;
+  const canSeeRegister = isOwner || user.permissions?.registerManagement;
+
   const menuItems = useMemo(() => {
     const baseItems = [
       { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -86,16 +90,15 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
     ];
 
     if (user.shopId) {
-      baseItems.splice(1, 0, { name: 'Inventory', icon: Package, path: '/services' });
-      
-      const isOwner = shop?.ownerId === user.id;
-      
-      if (isOwner || user.canSeeDuty) {
-        baseItems.push({ name: 'Staff on Duty', icon: Users, path: '/duty' });
+      if (isOwner || user.permissions?.editInventory) {
+        baseItems.splice(1, 0, { name: 'Inventory', icon: Package, path: '/services' });
       }
       
-      // Check 4: Sidebar Link - Path set to exactly '/register'
-      if (isOwner || user.canManageRegister) {
+      if (canSeeDuty) {
+        baseItems.push({ name: 'Staff on Duty', icon: Users, path: '/staff-duty' });
+      }
+      
+      if (canSeeRegister) {
         baseItems.push({ name: 'Register', icon: ClipboardList, path: '/register' });
       }
 
@@ -104,10 +107,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
 
     baseItems.push({ name: 'History', icon: History, path: '/history' });
     return baseItems;
-  }, [user, shop]);
+  }, [user.shopId, isOwner, user.permissions]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row">
+      {/* Mobile Header - Phone View Branding */}
       <div className="md:hidden bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <h1 className="text-blue-600 font-black text-xl tracking-tighter uppercase leading-none">SHOP FINDER</h1>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
@@ -115,6 +119,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
         </button>
       </div>
 
+      {/* Sidebar - Computer View Branding */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-72 bg-white border-r transform transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0
@@ -205,6 +210,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, shop, allShops = [], on
         </div>
       </aside>
 
+      {/* Status Update Modal */}
       {showCommentModal && shop && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
