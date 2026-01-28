@@ -1,6 +1,8 @@
+
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+// Using @firebase/auth directly to resolve export member errors in some environments
+import { getAuth } from "@firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAXjMbSmR4d-u3XhpLsS9F7_aFjmMA8BTI",
