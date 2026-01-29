@@ -91,6 +91,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       return;
     }
 
+    // Resolve shift objects from library to store full details on profile
+    const resolvedAssignedShifts = (userShop.shifts || []).filter(s => 
+      (newStaff.eligibleShifts || []).includes(s.id)
+    );
+
     const staff: Staff = { 
       id: editingStaff?.id || Math.random().toString(36).substr(2, 9), 
       fullName: newStaff.fullName!,
@@ -99,12 +104,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       code: editingStaff?.code || generateStaffCode(),
       position: newStaff.position || 'Staff',
       eligibleShifts: newStaff.eligibleShifts || [],
+      assignedShifts: resolvedAssignedShifts, // Store specific start/end times in staff profile
       permissions: newStaff.permissions!
     };
 
     let updatedStaffList;
     if (editingStaff) {
-      updatedStaffList = userShop.staff.map(s => s.id === editingStaff.id ? staff : s);
+      updatedStaffList = (userShop.staff || []).map(s => s.id === editingStaff.id ? staff : s);
     } else {
       updatedStaffList = [...(userShop.staff || []), staff];
     }
@@ -307,7 +313,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       {/* Staff Management Modal */}
       {activeModal === 'staff' && userShop && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-8 border-b bg-gray-50/50 flex justify-between items-center">
               <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Team Management</h2>
               <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
@@ -329,6 +335,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
                         <span className="bg-slate-50 px-3 py-1 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest border">{member.position}</span>
                       </div>
                       <p className="text-xs font-bold text-slate-500">Phone: {member.phone}</p>
+                      {member.assignedShifts && member.assignedShifts.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {member.assignedShifts.map(s => (
+                            <span key={s.id} className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100 uppercase">{s.name}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2 mt-6 pt-6 border-t border-slate-50">
                       <button onClick={() => { setEditingStaff(member); setNewStaff(member); setActiveModal('addStaff'); }} className="flex-1 py-3 bg-slate-50 text-slate-600 font-black rounded-xl text-xs uppercase tracking-widest">Edit Profile</button>
