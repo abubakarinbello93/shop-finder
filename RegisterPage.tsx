@@ -190,7 +190,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
     try {
       const currentDateStr = new Date().toISOString().split('T')[0];
       
-      // 2. Adjust logic: Use eligibleStaff as base so everyone appears even with 0 hours
+      // Use eligibleStaff as base so everyone appears even with 0 hours
       return eligibleStaff.map(staff => {
         const records = monthlyAttendance.filter(r => r.staffId === staff.id);
         
@@ -199,8 +199,11 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
         let totalPenaltyMins = 0; // Total Penalty Mins
 
         records.forEach(rec => {
-          const primaryShiftId = staff.eligibleShifts?.[0];
-          const shift = (userShop.shifts || []).find(s => s.id === primaryShiftId);
+          // Priority 1: Use specific Shift ID from the record if it exists
+          // Priority 2: Use the first Assigned Shift snapshot from the staff profile (synchronized via Firebase)
+          // Priority 3: Fallback to lookup from global shop shifts
+          const shift = (staff.assignedShifts || []).find(s => s.id === (rec.assignedShiftId || staff.eligibleShifts?.[0]))
+                        || (userShop.shifts || []).find(s => s.id === (rec.assignedShiftId || staff.eligibleShifts?.[0]));
           
           if (!shift) return;
 
