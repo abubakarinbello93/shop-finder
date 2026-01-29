@@ -213,13 +213,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
           let shiftEndMins = getDayMins(eh, em);
           if (shiftEndMins < shiftStartMins) shiftEndMins += 24 * 60; // Overnight
 
-          // Fix: Ensure Absent status shows full shift Expected Hours
+          // Expected Hours Calculation
           if (rec.status === 'Absent') {
             const shiftDuration = shiftEndMins - shiftStartMins;
             totalHeMins += shiftDuration;
-            totalPenaltyMins += shiftDuration;
+            // Removed shiftDuration from penalty for Absent as per new requirements
           } 
-          // Fix: Ensure Sign In (Present) status calculates remaining shift time
           else if (rec.signIn) {
             const signInDate = new Date(rec.signIn);
             const signInMins = getDayMins(signInDate.getHours(), signInDate.getMinutes());
@@ -249,14 +248,15 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
               const dailyHaMins = Math.max(0, actualEndMins - actualStartMins);
               totalHaMins += dailyHaMins;
 
-              // Penalty: Unapproved breaks
+              // Penalty Logic Update: (Total minutes late) + (Total minutes spent on unapproved breaks)
+              // 1. Unapproved breaks
               const unapprovedBreakMins = (rec.breaks || []).filter(b => !b.approved).reduce((acc, b) => {
                 if (b.end && b.start) return acc + (b.end - b.start) / (1000 * 60);
                 return acc;
               }, 0);
               totalPenaltyMins += unapprovedBreakMins;
 
-              // Penalty: Lateness (Sign in after shift start)
+              // 2. Lateness (Sign in after shift start)
               if (signInMins > shiftStartMins) {
                 totalPenaltyMins += (signInMins - shiftStartMins);
               }
@@ -401,8 +401,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
                       <th className="px-8 py-6">Contact Info</th>
                       <th className="px-8 py-6 text-center">Expected Hours</th>
                       <th className="px-8 py-6 text-center">Actual Hours</th>
-                      <th className="px-8 py-6 text-center">Penalty</th>
-                      <th className="px-8 py-6 text-right">Performance</th>
+                      <th className="px-8 py-6 text-center">Penalty (Min)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -418,11 +417,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
                         <td className="px-8 py-6 text-center font-black text-slate-700">{formatMinsToHM(expectedMins)}</td>
                         <td className="px-8 py-6 text-center font-black text-indigo-600">{formatMinsToHM(actualMins)}</td>
                         <td className="px-8 py-6 text-center font-black text-red-500">{formatMinsToHM(penaltyMins)}</td>
-                        <td className="px-8 py-6 text-right">
-                          <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${actualMins >= expectedMins && expectedMins > 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                            {actualMins >= expectedMins && expectedMins > 0 ? 'Excellent' : 'Deficit'}
-                          </span>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -432,9 +426,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
                       <td className="px-8 py-6 text-center">{formatMinsToHM(totals.expected)}</td>
                       <td className="px-8 py-6 text-center">{formatMinsToHM(totals.actual)}</td>
                       <td className="px-8 py-6 text-center text-red-400">{formatMinsToHM(totals.penalty)}</td>
-                      <td className="px-8 py-6 text-right">
-                         <span className="text-[10px] uppercase tracking-widest font-black opacity-60">Shop Finder Smart Report</span>
-                      </td>
                     </tr>
                   </tfoot>
                 </table>
@@ -460,8 +451,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
               <th className="py-4 text-left px-4 font-black uppercase text-sm">Staff Name</th>
               <th className="py-4 text-center px-4 font-black uppercase text-sm">Expected</th>
               <th className="py-4 text-center px-4 font-black uppercase text-sm">Actual</th>
-              <th className="py-4 text-center px-4 font-black uppercase text-sm">Penalty</th>
-              <th className="py-4 text-right px-4 font-black uppercase text-sm">Status</th>
+              <th className="py-4 text-center px-4 font-black uppercase text-sm">Penalty (Min)</th>
             </tr>
           </thead>
           <tbody>
@@ -471,9 +461,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
                 <td className="py-4 px-4 text-center">{formatMinsToHM(expectedMins)}</td>
                 <td className="py-4 px-4 text-center">{formatMinsToHM(actualMins)}</td>
                 <td className="py-4 px-4 text-center">{formatMinsToHM(penaltyMins)}</td>
-                <td className="py-4 px-4 text-right font-black">
-                  {actualMins >= expectedMins && expectedMins > 0 ? 'EXCELLENT' : 'DEFICIT'}
-                </td>
               </tr>
             ))}
           </tbody>
@@ -483,7 +470,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
               <td className="py-6 px-4 text-center font-black">{formatMinsToHM(totals.expected)}</td>
               <td className="py-6 px-4 text-center font-black">{formatMinsToHM(totals.actual)}</td>
               <td className="py-6 px-4 text-center font-black">{formatMinsToHM(totals.penalty)}</td>
-              <td className="py-6 px-4"></td>
             </tr>
           </tfoot>
         </table>
@@ -507,7 +493,15 @@ const DailyStaffCard: React.FC<{
   onAction: (a: 'in' | 'out' | 'break_start' | 'break_end' | 'absent', approved?: boolean) => void,
   onSaveOvertime: (mins: number) => void
 }> = ({ staff, record, onAction, onSaveOvertime }) => {
-  const [ot, setOt] = useState(record?.overtimeMinutes || 0);
+  // Split overtimeMinutes into Hours and Minutes states
+  const [otHours, setOtHours] = useState(Math.floor((record?.overtimeMinutes || 0) / 60));
+  const [otMinutes, setOtMinutes] = useState((record?.overtimeMinutes || 0) % 60);
+
+  // Sync state if record updates externally
+  useEffect(() => {
+    setOtHours(Math.floor((record?.overtimeMinutes || 0) / 60));
+    setOtMinutes((record?.overtimeMinutes || 0) % 60);
+  }, [record?.overtimeMinutes]);
 
   const statusColors: any = {
     'Present': 'bg-green-500',
@@ -558,10 +552,38 @@ const DailyStaffCard: React.FC<{
                 </div>
               )}
               
-              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl w-full md:w-auto shadow-inner">
-                 <input type="number" className="w-16 p-3 bg-white border-2 rounded-xl font-black text-center text-xs outline-none focus:border-blue-600 transition-all" value={ot} onChange={e => setOt(Number(e.target.value))} />
-                 <p className="text-[10px] font-black text-slate-400 uppercase flex-1 md:flex-none text-center">Overtime</p>
-                 <button onClick={() => onSaveOvertime(ot)} className="p-3 bg-blue-600 text-white rounded-xl shadow-lg active:scale-95 transition-all"><Save className="h-4 w-4" /></button>
+              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl w-full md:w-auto shadow-inner border border-slate-100">
+                 <div className="flex gap-2 items-center">
+                    <div className="flex flex-col items-center">
+                      <input 
+                        type="number" 
+                        min="0"
+                        className="w-12 p-2 bg-white border rounded-xl font-black text-center text-xs outline-none focus:border-blue-600 transition-all" 
+                        value={otHours} 
+                        onChange={e => setOtHours(Math.max(0, parseInt(e.target.value) || 0))} 
+                      />
+                      <span className="text-[7px] font-black text-slate-400 uppercase mt-1">Hours</span>
+                    </div>
+                    <span className="font-black text-slate-300">:</span>
+                    <div className="flex flex-col items-center">
+                      <input 
+                        type="number" 
+                        min="0"
+                        max="59"
+                        className="w-12 p-2 bg-white border rounded-xl font-black text-center text-xs outline-none focus:border-blue-600 transition-all" 
+                        value={otMinutes} 
+                        onChange={e => setOtMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))} 
+                      />
+                      <span className="text-[7px] font-black text-slate-400 uppercase mt-1">Mins</span>
+                    </div>
+                 </div>
+                 <p className="text-[9px] font-black text-slate-400 uppercase hidden lg:block tracking-tighter">Total OT</p>
+                 <button 
+                  onClick={() => onSaveOvertime(otHours * 60 + otMinutes)} 
+                  className="p-3 bg-blue-600 text-white rounded-xl shadow-lg active:scale-95 transition-all hover:bg-blue-700"
+                 >
+                   <Save className="h-4 w-4" />
+                 </button>
               </div>
             </>
           )}
