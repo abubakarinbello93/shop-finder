@@ -92,7 +92,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
   // Filter staff who have at least one eligible shift
   const eligibleStaff = useMemo(() => {
     if (!userShop) return [];
-    return (userShop.staff || []).filter(s => (s.eligibleShifts || []).length > 0);
+    return (userShop.staff || []).filter(s => (s.assignedShifts || []).length > 0);
   }, [userShop]);
 
   const handleAction = async (staffId: string, action: 'in' | 'out' | 'break_start' | 'break_end' | 'absent', breakApproved?: boolean) => {
@@ -199,11 +199,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
         let totalPenaltyMins = 0; // Total Penalty Mins
 
         records.forEach(rec => {
-          // Priority 1: Use specific Shift ID from the record if it exists
-          // Priority 2: Use the first Assigned Shift snapshot from the staff profile (synchronized via Firebase)
-          // Priority 3: Fallback to lookup from global shop shifts
-          const shift = (staff.assignedShifts || []).find(s => s.id === (rec.assignedShiftId || staff.eligibleShifts?.[0]))
-                        || (userShop.shifts || []).find(s => s.id === (rec.assignedShiftId || staff.eligibleShifts?.[0]));
+          // Map ID back to actual shift times from library to fix '0 hours' error
+          const primaryShiftId = rec.assignedShiftId || (staff.assignedShifts && staff.assignedShifts[0]);
+          const shift = (userShop.shifts || []).find(s => s.id === primaryShiftId);
           
           if (!shift) return;
 
