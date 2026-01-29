@@ -37,7 +37,7 @@ export interface Staff {
   password?: string;
   code: string; // 6-character unique code
   position: string;
-  eligibleShifts: string[]; // Array of Shift IDs
+  assignedShifts: string[]; // Array of Shift IDs (updated from Shift[] snapshot)
   permissions: StaffPermissions;
   canAddItems?: boolean; // Legacy field for compatibility
 }
