@@ -514,3 +514,4 @@ const DailyStaffCard: React.FC<{
 };
 
 export default RegisterPage;
+
