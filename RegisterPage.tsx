@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ClipboardList, ArrowLeft, Clock, Save, User, 
   Calendar, Check, X, Coffee, AlertCircle, RefreshCw, 
-  UserMinus, TrendingUp, Calculator 
+  UserMinus, TrendingUp, Calculator, Printer, FileText
 } from 'lucide-react';
 import Layout from './Layout';
 import { AppState, Shop, AttendanceRecord, Staff, Shift } from './types';
@@ -15,6 +15,13 @@ interface RegisterPageProps {
   onLogout: () => void;
   onUpdateShop: (id: string, updates: Partial<Shop>) => void;
 }
+
+const formatMinsToHM = (totalMins: number) => {
+  if (totalMins <= 0) return '0H 00M';
+  const h = Math.floor(totalMins / 60);
+  const m = Math.round(totalMins % 60);
+  return `${h}H ${m.toString().padStart(2, '0')}M`;
+};
 
 const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateShop }) => {
   const navigate = useNavigate();
@@ -75,8 +82,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
     const existing = attendance.find(r => r.staffId === staffId);
 
     try {
-      console.log(`Attempting Firestore action: ${action} for staff ${staffId} at path: shops/${userShop.id}/attendance/${recordId}`);
-      
       if (action === 'in') {
         await setDoc(recordRef, {
           staffId, 
@@ -117,14 +122,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
           overtimeMinutes: 0 
         }, { merge: true });
       }
-      console.log("Firestore action successful.");
     } catch (e: any) {
       console.error("CRITICAL REGISTER ERROR:", e);
-      if (e.code === 'permission-denied') {
-        alert("PERMISSION DENIED: Please ensure you have updated your Firestore Security Rules in the Firebase Console as requested.");
-      } else {
-        alert(`Update failed: ${e.message}`);
-      }
+      alert(`Update failed: ${e.message}`);
     }
   };
 
@@ -157,6 +157,10 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   // Performance Math
   const monthlyStats = useMemo(() => {
     if (!userShop) return [];
@@ -164,60 +168,71 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
       return eligibleStaff.map(staff => {
         const records = monthlyAttendance.filter(r => r.staffId === staff.id);
         
-        let He = 0; // Expected Hours
-        let Ha = 0; // Actual Hours
-        let P = 0;  // Penalties (minutes)
+        let totalHeMins = 0; // Total Expected Mins
+        let totalHaMins = 0; // Total Actual Mins
+        let totalPenaltyMins = 0; // Total Penalty Mins
 
         records.forEach(rec => {
-          const totalEligibleDuration = (staff.eligibleShifts || []).reduce((acc, shiftId) => {
-            const shift = (userShop.shifts || []).find(s => s.id === shiftId);
-            if (shift) {
-              const [sh, sm] = (shift.start || "09:00").split(':').map(Number);
-              const [eh, em] = (shift.end || "17:00").split(':').map(Number);
-              let duration = (eh * 60 + em) - (sh * 60 + sm);
-              if (duration < 0) duration += 24 * 60; // Overnight
-              return acc + duration;
-            }
-            return acc;
-          }, 0);
+          // Identify relevant shift (we assume the first eligible shift is primary for calculation)
+          const primaryShiftId = staff.eligibleShifts?.[0];
+          const shift = (userShop.shifts || []).find(s => s.id === primaryShiftId);
           
-          const dayHe = totalEligibleDuration / (staff.eligibleShifts?.length || 1);
-          He += dayHe;
+          if (!shift) return;
+
+          const [sh, sm] = (shift.start || "09:00").split(':').map(Number);
+          const [eh, em] = (shift.end || "17:00").split(':').map(Number);
+          
+          // Helper to get total minutes from start of day
+          const getDayMins = (h: number, m: number) => h * 60 + m;
+          const shiftStartMins = getDayMins(sh, sm);
+          let shiftEndMins = getDayMins(eh, em);
+          if (shiftEndMins < shiftStartMins) shiftEndMins += 24 * 60; // Handle overnight shifts
 
           if (rec.status === 'Absent') {
-            P += dayHe; // Penalty for absent day
-          } else if (rec.signIn && rec.signOut) {
-            const totalInMins = (rec.signOut - rec.signIn) / (1000 * 60);
-            const unapprovedBreakMins = (rec.breaks || []).filter(b => !b.approved).reduce((acc, b) => {
-              if (b.end && b.start) return acc + (b.end - b.start) / (1000 * 60);
-              return acc;
-            }, 0);
+            totalPenaltyMins += (shiftEndMins - shiftStartMins); // Full shift penalty
+            totalHeMins += (shiftEndMins - shiftStartMins);
+          } else if (rec.signIn) {
+            const signInDate = new Date(rec.signIn);
+            const signInMins = getDayMins(signInDate.getHours(), signInDate.getMinutes());
             
-            Ha += (totalInMins - unapprovedBreakMins + (rec.overtimeMinutes || 0));
-            
-            // Late Penalty
-            const firstShiftId = staff.eligibleShifts?.[0];
-            const firstShift = (userShop.shifts || []).find(s => s.id === firstShiftId);
-            if (firstShift) {
-              const [sh, sm] = (firstShift.start || "09:00").split(':').map(Number);
-              const inDate = new Date(rec.signIn);
-              const shiftStart = new Date(rec.signIn);
-              shiftStart.setHours(sh, sm, 0, 0);
-              if (inDate.getTime() > shiftStart.getTime()) {
-                P += (inDate.getTime() - shiftStart.getTime()) / (1000 * 60);
+            // Expected Hours Calculation: from actual 'Sign In' until 'Shift End' (capped at shift limit)
+            // If they sign in BEFORE shift start, Expected starts AT shift start.
+            // If they sign in AFTER shift start, Expected starts AT sign in.
+            const expectedStartMins = Math.max(signInMins, shiftStartMins);
+            const dailyHeMins = Math.max(0, shiftEndMins - expectedStartMins);
+            totalHeMins += dailyHeMins;
+
+            if (rec.signOut) {
+              const signOutDate = new Date(rec.signOut);
+              const signOutMins = getDayMins(signOutDate.getHours(), signOutDate.getMinutes());
+
+              // Actual Hours Calculation: strictly within shift window
+              // Overlap between [signIn, signOut] and [shiftStart, shiftEnd]
+              const actualStartMins = Math.max(signInMins, shiftStartMins);
+              const actualEndMins = Math.min(signOutMins, shiftEndMins);
+              const dailyHaMins = Math.max(0, actualEndMins - actualStartMins);
+              totalHaMins += dailyHaMins;
+
+              // Penalty: Unapproved breaks
+              const unapprovedBreakMins = (rec.breaks || []).filter(b => !b.approved).reduce((acc, b) => {
+                if (b.end && b.start) return acc + (b.end - b.start) / (1000 * 60);
+                return acc;
+              }, 0);
+              totalPenaltyMins += unapprovedBreakMins;
+
+              // Penalty: Lateness (Sign in after shift start)
+              if (signInMins > shiftStartMins) {
+                totalPenaltyMins += (signInMins - shiftStartMins);
               }
             }
-            
-            // Unapproved Break Penalty
-            P += unapprovedBreakMins;
           }
         });
 
         return {
           staff,
-          expectedHours: (He / 60).toFixed(1),
-          actualHours: (Ha / 60).toFixed(1),
-          penaltyMinutes: Math.round(P)
+          expectedMins: totalHeMins,
+          actualMins: totalHaMins,
+          penaltyMins: Math.round(totalPenaltyMins)
         };
       });
     } catch (err) {
@@ -225,6 +240,14 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
       return [];
     }
   }, [eligibleStaff, monthlyAttendance, userShop]);
+
+  const totals = useMemo(() => {
+    return monthlyStats.reduce((acc, curr) => ({
+      expected: acc.expected + curr.expectedMins,
+      actual: acc.actual + curr.actualMins,
+      penalty: acc.penalty + curr.penaltyMins
+    }), { expected: 0, actual: 0, penalty: 0 });
+  }, [monthlyStats]);
 
   if (loading) {
     return (
@@ -251,7 +274,18 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
 
   return (
     <Layout user={currentUser!} shop={userShop} onLogout={onLogout} onUpdateShop={onUpdateShop}>
-      <div className="w-full min-h-full flex flex-col">
+      <style>
+        {`
+          @media print {
+            body * { visibility: hidden; }
+            #printable-report, #printable-report * { visibility: visible; }
+            #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+          }
+        `}
+      </style>
+
+      <div className="w-full min-h-full flex flex-col no-print">
         <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 w-full">
           <div>
             <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-blue-600 font-black mb-4 hover:gap-3 transition-all"><ArrowLeft className="h-5 w-5" /> Workspace</button>
@@ -262,12 +296,15 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
             </div>
           </div>
           
-          {activeTab === 'monthly' && (
-            <div className="flex gap-3">
-              <input type="month" className="p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-indigo-600 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
-              <button onClick={clearRecordsForMonth} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all border-2 border-red-100"><RefreshCw className="h-5 w-5" /></button>
-            </div>
-          )}
+          <div className="flex gap-3">
+            {activeTab === 'monthly' && (
+              <>
+                <input type="month" className="p-4 bg-white border-2 rounded-2xl font-black text-sm outline-none focus:border-indigo-600 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+                <button onClick={handlePrint} className="p-4 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-100 flex items-center gap-2 font-black text-xs uppercase tracking-widest"><Printer className="h-4 w-4" /> Print</button>
+              </>
+            )}
+            <button onClick={clearRecordsForMonth} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all border-2 border-red-100"><RefreshCw className="h-5 w-5" /></button>
+          </div>
         </div>
 
         <div className="flex-1 w-full">
@@ -304,14 +341,14 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
                     <tr>
                       <th className="px-8 py-6">Staff Member</th>
                       <th className="px-8 py-6">Contact</th>
-                      <th className="px-8 py-6 text-center">Expected (Hr)</th>
-                      <th className="px-8 py-6 text-center">Actual (Hr)</th>
-                      <th className="px-8 py-6 text-center">Penalty (Min)</th>
+                      <th className="px-8 py-6 text-center">Expected Hours</th>
+                      <th className="px-8 py-6 text-center">Actual Hours</th>
+                      <th className="px-8 py-6 text-center">Penalty</th>
                       <th className="px-8 py-6 text-right">Performance</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {monthlyStats.map(({ staff, expectedHours, actualHours, penaltyMinutes }) => (
+                    {monthlyStats.map(({ staff, expectedMins, actualMins, penaltyMins }) => (
                       <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-4">
@@ -320,21 +357,86 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
                           </div>
                         </td>
                         <td className="px-8 py-6 text-slate-500 font-bold text-sm">{staff.phone}</td>
-                        <td className="px-8 py-6 text-center font-black text-slate-700">{expectedHours}</td>
-                        <td className="px-8 py-6 text-center font-black text-indigo-600">{actualHours}</td>
-                        <td className="px-8 py-6 text-center font-black text-red-500">{penaltyMinutes}</td>
+                        <td className="px-8 py-6 text-center font-black text-slate-700">{formatMinsToHM(expectedMins)}</td>
+                        <td className="px-8 py-6 text-center font-black text-indigo-600">{formatMinsToHM(actualMins)}</td>
+                        <td className="px-8 py-6 text-center font-black text-red-500">{formatMinsToHM(penaltyMins)}</td>
                         <td className="px-8 py-6 text-right">
-                          <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${Number(actualHours) >= Number(expectedHours) ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                            {Number(actualHours) >= Number(expectedHours) ? 'Excellent' : 'Deficit'}
+                          <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${actualMins >= expectedMins ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                            {actualMins >= expectedMins ? 'Excellent' : 'Deficit'}
                           </span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-black">
+                      <td colSpan={2} className="px-8 py-6 uppercase tracking-widest text-xs">Monthly Totals</td>
+                      <td className="px-8 py-6 text-center">{formatMinsToHM(totals.expected)}</td>
+                      <td className="px-8 py-6 text-center">{formatMinsToHM(totals.actual)}</td>
+                      <td className="px-8 py-6 text-center text-red-400">{formatMinsToHM(totals.penalty)}</td>
+                      <td className="px-8 py-6 text-right">
+                         <span className="text-[10px] uppercase tracking-widest">Aggregate Summary</span>
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Printer Friendly View */}
+      <div id="printable-report" className="hidden p-10 bg-white text-black font-sans">
+        <div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end">
+          <div>
+            <h1 className="text-4xl font-black uppercase tracking-tighter">Staff Attendance Report</h1>
+            <p className="text-xl font-bold mt-1">{userShop.name} • {selectedMonth}</p>
+          </div>
+          <p className="text-sm font-black uppercase">Report Generated: {new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b-2 border-black">
+              <th className="py-4 text-left font-black uppercase text-sm">Staff Name</th>
+              <th className="py-4 text-center font-black uppercase text-sm">Expected</th>
+              <th className="py-4 text-center font-black uppercase text-sm">Actual</th>
+              <th className="py-4 text-center font-black uppercase text-sm">Penalty</th>
+              <th className="py-4 text-right font-black uppercase text-sm">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {monthlyStats.map(({ staff, expectedMins, actualMins, penaltyMins }) => (
+              <tr key={staff.id} className="border-b border-gray-200">
+                <td className="py-4 font-bold">{staff.fullName}</td>
+                <td className="py-4 text-center">{formatMinsToHM(expectedMins)}</td>
+                <td className="py-4 text-center">{formatMinsToHM(actualMins)}</td>
+                <td className="py-4 text-center">{formatMinsToHM(penaltyMins)}</td>
+                <td className="py-4 text-right font-black">
+                  {actualMins >= expectedMins ? 'EXCELLENT' : 'DEFICIT'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="bg-gray-100 border-t-2 border-black">
+              <td className="py-6 font-black uppercase">Grand Totals</td>
+              <td className="py-6 text-center font-black">{formatMinsToHM(totals.expected)}</td>
+              <td className="py-6 text-center font-black">{formatMinsToHM(totals.actual)}</td>
+              <td className="py-6 text-center font-black">{formatMinsToHM(totals.penalty)}</td>
+              <td className="py-6"></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div className="mt-20 flex justify-between items-start">
+          <div className="w-64 border-t-2 border-black pt-2">
+            <p className="text-xs font-black uppercase">Manager Signature</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-gray-400">Generated via Shop Finder Smart Register</p>
+          </div>
         </div>
       </div>
     </Layout>
@@ -356,6 +458,9 @@ const DailyStaffCard: React.FC<{
     'Sign Out': 'bg-slate-400'
   };
 
+  // Rule 4: If sign out, treat like no record to show "Sign In" again
+  const isResetState = !record || record.status === 'Absent' || record.status === 'Sign Out';
+
   return (
     <div className="p-8 bg-white border-2 border-transparent rounded-[32px] shadow-sm hover:border-blue-100 transition-all w-full">
       <div className="flex flex-col xl:flex-row gap-8 justify-between items-center md:items-start">
@@ -374,7 +479,7 @@ const DailyStaffCard: React.FC<{
         </div>
 
         <div className="flex-1 flex flex-col md:flex-row items-center gap-6 justify-end w-full md:w-auto">
-          {!record || record.status === 'Absent' ? (
+          {isResetState ? (
             <div className="flex gap-2 w-full md:w-auto">
               <button onClick={() => onAction('in')} className="flex-1 md:flex-none px-6 py-4 bg-green-600 text-white font-black rounded-2xl shadow-lg shadow-green-100 text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"><Check className="h-4 w-4" /> Sign In</button>
               <button onClick={() => onAction('absent')} className="flex-1 md:flex-none px-6 py-4 bg-red-50 text-red-600 border-2 border-red-100 font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"><X className="h-4 w-4" /> Absent</button>
