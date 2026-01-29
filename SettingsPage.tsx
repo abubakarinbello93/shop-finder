@@ -32,7 +32,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
     phone: '', 
     password: '', 
     position: '',
-    eligibleShifts: [],
+    assignedShifts: [],
     permissions: {
       editInventory: false,
       seeStaffOnDuty: false,
@@ -91,11 +91,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       return;
     }
 
-    // Resolve shift objects from library to store full details on profile
-    const resolvedAssignedShifts = (userShop.shifts || []).filter(s => 
-      (newStaff.eligibleShifts || []).includes(s.id)
-    );
-
     const staff: Staff = { 
       id: editingStaff?.id || Math.random().toString(36).substr(2, 9), 
       fullName: newStaff.fullName!,
@@ -103,8 +98,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       password: newStaff.password!,
       code: editingStaff?.code || generateStaffCode(),
       position: newStaff.position || 'Staff',
-      eligibleShifts: newStaff.eligibleShifts || [],
-      assignedShifts: resolvedAssignedShifts, // Store specific start/end times in staff profile
+      assignedShifts: newStaff.assignedShifts || [],
       permissions: newStaff.permissions!
     };
 
@@ -117,7 +111,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
 
     onUpdateShop(userShop.id, { staff: updatedStaffList });
     setNewStaff({ 
-      fullName: '', phone: '', password: '', position: '', eligibleShifts: [], 
+      fullName: '', phone: '', password: '', position: '', assignedShifts: [], 
       permissions: { editInventory: false, seeStaffOnDuty: false, registerManagement: false, statusControl: false } 
     });
     setEditingStaff(null);
@@ -319,7 +313,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
               <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
             </div>
             <div className="p-8 overflow-y-auto flex-1">
-              <button onClick={() => { setEditingStaff(null); setNewStaff({ fullName:'', phone:'', password:'', position:'', eligibleShifts:[], permissions:{editInventory:false, seeStaffOnDuty:false, registerManagement:false, statusControl:false} }); setActiveModal('addStaff'); }} className="w-full mb-8 p-6 bg-blue-50 border-4 border-dashed border-blue-100 rounded-[32px] text-blue-600 font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-100 transition-all">
+              <button onClick={() => { setEditingStaff(null); setNewStaff({ fullName:'', phone:'', password:'', position:'', assignedShifts:[], permissions:{editInventory:false, seeStaffOnDuty:false, registerManagement:false, statusControl:false} }); setActiveModal('addStaff'); }} className="w-full mb-8 p-6 bg-blue-50 border-4 border-dashed border-blue-100 rounded-[32px] text-blue-600 font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-100 transition-all">
                 <UserPlus className="h-6 w-6" /> Add Team Member
               </button>
               
@@ -337,9 +331,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
                       <p className="text-xs font-bold text-slate-500">Phone: {member.phone}</p>
                       {member.assignedShifts && member.assignedShifts.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
-                          {member.assignedShifts.map(s => (
-                            <span key={s.id} className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100 uppercase">{s.name}</span>
-                          ))}
+                          {member.assignedShifts.map(sId => {
+                            const shift = (userShop.shifts || []).find(s => s.id === sId);
+                            return shift ? (
+                              <span key={sId} className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100 uppercase">{shift.name}</span>
+                            ) : null;
+                          })}
                         </div>
                       )}
                     </div>
@@ -406,11 +403,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
                         <button 
                           key={shift.id}
                           onClick={() => {
-                            const current = newStaff.eligibleShifts || [];
+                            const current = newStaff.assignedShifts || [];
                             const updated = current.includes(shift.id) ? current.filter(id => id !== shift.id) : [...current, shift.id];
-                            setNewStaff({...newStaff, eligibleShifts: updated});
+                            setNewStaff({...newStaff, assignedShifts: updated});
                           }}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${newStaff.eligibleShifts?.includes(shift.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100'}`}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${newStaff.assignedShifts?.includes(shift.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100'}`}
                         >
                           {shift.name} ({shift.start}-{shift.end})
                         </button>
