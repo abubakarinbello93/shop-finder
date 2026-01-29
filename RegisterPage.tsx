@@ -188,6 +188,8 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
   const monthlyStats = useMemo(() => {
     if (!userShop) return [];
     try {
+      const currentDateStr = new Date().toISOString().split('T')[0];
+      
       // 2. Adjust logic: Use eligibleStaff as base so everyone appears even with 0 hours
       return eligibleStaff.map(staff => {
         const records = monthlyAttendance.filter(r => r.staffId === staff.id);
@@ -210,10 +212,14 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
           let shiftEndMins = getDayMins(eh, em);
           if (shiftEndMins < shiftStartMins) shiftEndMins += 24 * 60; // Overnight
 
+          // Fix: Ensure Absent status shows full shift Expected Hours
           if (rec.status === 'Absent') {
-            totalPenaltyMins += (shiftEndMins - shiftStartMins);
-            totalHeMins += (shiftEndMins - shiftStartMins);
-          } else if (rec.signIn) {
+            const shiftDuration = shiftEndMins - shiftStartMins;
+            totalHeMins += shiftDuration;
+            totalPenaltyMins += shiftDuration;
+          } 
+          // Fix: Ensure Sign In (Present) status calculates remaining shift time
+          else if (rec.signIn) {
             const signInDate = new Date(rec.signIn);
             const signInMins = getDayMins(signInDate.getHours(), signInDate.getMinutes());
             
@@ -222,13 +228,23 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
             const dailyHeMins = Math.max(0, shiftEndMins - effectiveStartMins);
             totalHeMins += dailyHeMins;
 
+            // Actual Hours Calculation: calculate progress for active shifts
+            let endToUseMins: number | null = null;
             if (rec.signOut) {
               const signOutDate = new Date(rec.signOut);
-              const signOutMins = getDayMins(signOutDate.getHours(), signOutDate.getMinutes());
+              endToUseMins = getDayMins(signOutDate.getHours(), signOutDate.getMinutes());
+              // Handle overnight sign out
+              if (endToUseMins < shiftStartMins && shiftEndMins > 1440) endToUseMins += 1440;
+            } else if (rec.date === currentDateStr) {
+              const now = new Date();
+              endToUseMins = getDayMins(now.getHours(), now.getMinutes());
+              // Handle overnight current work
+              if (endToUseMins < shiftStartMins && shiftEndMins > 1440) endToUseMins += 1440;
+            }
 
-              // Actual Hours Calculation: strictly within shift window
+            if (endToUseMins !== null) {
               const actualStartMins = Math.max(signInMins, shiftStartMins);
-              const actualEndMins = Math.min(signOutMins, shiftEndMins);
+              const actualEndMins = Math.min(endToUseMins, shiftEndMins);
               const dailyHaMins = Math.max(0, actualEndMins - actualStartMins);
               totalHaMins += dailyHaMins;
 
@@ -258,7 +274,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ state, onLogout, onUpdateSh
       console.error("Monthly calculation error:", err);
       return [];
     }
-  }, [eligibleStaff, monthlyAttendance, userShop]);
+  }, [eligibleStaff, monthlyAttendance, userShop, today]);
 
   const totals = useMemo(() => {
     return monthlyStats.reduce((acc, curr) => ({
