@@ -16,13 +16,6 @@ export interface ServiceItem {
   restockDate?: number; // Timestamp for when the item becomes available again
 }
 
-export interface Shift {
-  id: string;
-  name: string;
-  start: string; // HH:mm
-  end: string; // HH:mm
-}
-
 export interface StaffPermissions {
   editInventory: boolean;
   seeStaffOnDuty: boolean;
@@ -37,7 +30,6 @@ export interface Staff {
   password?: string;
   code: string; // 6-character unique code
   position: string;
-  assignedShifts: string[]; // Array of Shift IDs (updated from Shift[] snapshot)
   permissions: StaffPermissions;
   canAddItems?: boolean; // Legacy field for compatibility
 }
@@ -98,7 +90,6 @@ export interface Shop {
   businessHours: BusinessHour[];
   items: ServiceItem[];
   staff: Staff[];
-  shifts: Shift[];
   location?: {
     lat: number;
     lng: number;
