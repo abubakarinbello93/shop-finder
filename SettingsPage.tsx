@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Lock, Users, Save, X, Plus, Trash2, Calendar, UserPlus, ChevronRight, Check, ArrowLeft, AlertCircle, Eye, EyeOff, LayoutList } from 'lucide-react';
+import { Clock, Lock, Users, Save, X, Plus, Trash2, Calendar, UserPlus, ChevronRight, Check, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import Layout from './Layout';
-import { AppState, Shop, BusinessHour, BusinessDay, Staff, Shift, StaffPermissions } from './types';
+import { AppState, Shop, BusinessHour, BusinessDay, Staff, StaffPermissions } from './types';
 import { DAYS } from './constants';
 
 interface SettingsPageProps {
@@ -19,7 +19,7 @@ const generateStaffCode = () => {
 };
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateShop, onUpdatePassword }) => {
-  const [activeModal, setActiveModal] = useState<'password' | 'staff' | 'addStaff' | 'hours' | 'shifts' | null>(null);
+  const [activeModal, setActiveModal] = useState<'password' | 'staff' | 'addStaff' | 'hours' | null>(null);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { currentUser, shops } = state;
@@ -32,7 +32,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
     phone: '', 
     password: '', 
     position: '',
-    assignedShifts: [],
     permissions: {
       editInventory: false,
       seeStaffOnDuty: false,
@@ -41,7 +40,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
     }
   });
 
-  const [newShift, setNewShift] = useState({ name: '', start: '09:00', end: '17:00' });
   const [tempHours, setTempHours] = useState<BusinessHour[]>(userShop?.businessHours || []);
   const [isAuto, setIsAuto] = useState(userShop?.isAutomatic || false);
   const [dayToAdd, setDayToAdd] = useState<BusinessDay | ''>('');
@@ -98,7 +96,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       password: newStaff.password!,
       code: editingStaff?.code || generateStaffCode(),
       position: newStaff.position || 'Staff',
-      assignedShifts: newStaff.assignedShifts || [],
       permissions: newStaff.permissions!
     };
 
@@ -111,28 +108,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
 
     onUpdateShop(userShop.id, { staff: updatedStaffList });
     setNewStaff({ 
-      fullName: '', phone: '', password: '', position: '', assignedShifts: [], 
+      fullName: '', phone: '', password: '', position: '', 
       permissions: { editInventory: false, seeStaffOnDuty: false, registerManagement: false, statusControl: false } 
     });
     setEditingStaff(null);
     setActiveModal('staff');
-  };
-
-  const handleAddShift = () => {
-    if (!newShift.name || !userShop) return;
-    const shift: Shift = { 
-      id: Math.random().toString(36).substr(2, 9), 
-      name: newShift.name, 
-      start: newShift.start, 
-      end: newShift.end 
-    };
-    onUpdateShop(userShop.id, { shifts: [...(userShop.shifts || []), shift] });
-    setNewShift({ name: '', start: '09:00', end: '17:00' });
-  };
-
-  const handleRemoveShift = (id: string) => {
-    if (!userShop) return;
-    onUpdateShop(userShop.id, { shifts: userShop.shifts.filter(s => s.id !== id) });
   };
 
   const handlePasswordChange = () => {
@@ -160,10 +140,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
   ];
 
   if (userShop) {
-    menuItems.unshift({ title: 'Shift Library', desc: 'Create global work shifts', icon: LayoutList, action: () => setActiveModal('shifts') });
     menuItems.unshift({ title: 'Facility Schedule', desc: 'Set your hours & auto-mode', icon: Clock, action: () => { setTempHours(userShop.businessHours || []); setIsAuto(userShop.isAutomatic); setActiveModal('hours'); } });
     if (isOwner) {
-      menuItems.push({ title: 'Team Management', desc: 'Staff roles & eligibility', icon: Users, action: () => setActiveModal('staff') });
+      menuItems.push({ title: 'Team Management', desc: 'Staff roles & permissions', icon: Users, action: () => setActiveModal('staff') });
     }
   }
 
@@ -269,41 +248,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
         </div>
       )}
 
-      {/* Shift Library Modal */}
-      {activeModal === 'shifts' && userShop && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-8 border-b bg-gray-50 flex justify-between items-center">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase leading-none">Shift Library</h2>
-              <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="p-8 overflow-y-auto flex-1">
-              <div className="mb-10 bg-blue-50 p-6 rounded-3xl border-2 border-dashed border-blue-200">
-                <h4 className="font-black text-blue-900 mb-4 uppercase tracking-widest text-xs">Create New Shift Definition</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <input className="p-4 bg-white border-2 rounded-xl font-bold text-sm" placeholder="Shift Name (e.g. Morning)" value={newShift.name} onChange={e => setNewShift({...newShift, name: e.target.value})} />
-                  <input type="time" className="p-4 bg-white border-2 rounded-xl font-bold text-sm" value={newShift.start} onChange={e => setNewShift({...newShift, start: e.target.value})} />
-                  <input type="time" className="p-4 bg-white border-2 rounded-xl font-bold text-sm" value={newShift.end} onChange={e => setNewShift({...newShift, end: e.target.value})} />
-                </div>
-                <button onClick={handleAddShift} className="w-full mt-4 py-4 bg-blue-600 text-white font-black rounded-xl shadow-lg shadow-blue-100 uppercase tracking-widest text-xs">Add to Library</button>
-              </div>
-
-              <div className="space-y-3">
-                {(userShop.shifts || []).map(s => (
-                  <div key={s.id} className="flex items-center justify-between p-5 bg-white border-2 rounded-2xl group hover:border-blue-100 transition-all">
-                    <div>
-                      <p className="font-black text-slate-900 uppercase tracking-tight">{s.name}</p>
-                      <p className="text-xs font-bold text-slate-400">{s.start} - {s.end}</p>
-                    </div>
-                    <button onClick={() => handleRemoveShift(s.id)} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="h-5 w-5" /></button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Staff Management Modal */}
       {activeModal === 'staff' && userShop && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
@@ -313,7 +257,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
               <button onClick={() => setActiveModal(null)} className="p-2 bg-white border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
             </div>
             <div className="p-8 overflow-y-auto flex-1">
-              <button onClick={() => { setEditingStaff(null); setNewStaff({ fullName:'', phone:'', password:'', position:'', assignedShifts:[], permissions:{editInventory:false, seeStaffOnDuty:false, registerManagement:false, statusControl:false} }); setActiveModal('addStaff'); }} className="w-full mb-8 p-6 bg-blue-50 border-4 border-dashed border-blue-100 rounded-[32px] text-blue-600 font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-100 transition-all">
+              <button onClick={() => { setEditingStaff(null); setNewStaff({ fullName:'', phone:'', password:'', position:'', permissions:{editInventory:false, seeStaffOnDuty:false, registerManagement:false, statusControl:false} }); setActiveModal('addStaff'); }} className="w-full mb-8 p-6 bg-blue-50 border-4 border-dashed border-blue-100 rounded-[32px] text-blue-600 font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-100 transition-all">
                 <UserPlus className="h-6 w-6" /> Add Team Member
               </button>
               
@@ -329,16 +273,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
                         <span className="bg-slate-50 px-3 py-1 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest border">{member.position}</span>
                       </div>
                       <p className="text-xs font-bold text-slate-500">Phone: {member.phone}</p>
-                      {member.assignedShifts && member.assignedShifts.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {member.assignedShifts.map(sId => {
-                            const shift = (userShop.shifts || []).find(s => s.id === sId);
-                            return shift ? (
-                              <span key={sId} className="text-[8px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg border border-blue-100 uppercase">{shift.name}</span>
-                            ) : null;
-                          })}
-                        </div>
-                      )}
                     </div>
                     <div className="flex gap-2 mt-6 pt-6 border-t border-slate-50">
                       <button onClick={() => { setEditingStaff(member); setNewStaff(member); setActiveModal('addStaff'); }} className="flex-1 py-3 bg-slate-50 text-slate-600 font-black rounded-xl text-xs uppercase tracking-widest">Edit Profile</button>
@@ -393,26 +327,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
                       <PermissionToggle label="See Staff on Duty" active={newStaff.permissions?.seeStaffOnDuty || false} onToggle={() => setNewStaff({...newStaff, permissions: {...newStaff.permissions!, seeStaffOnDuty: !newStaff.permissions?.seeStaffOnDuty}})} />
                       <PermissionToggle label="Register Management" active={newStaff.permissions?.registerManagement || false} onToggle={() => setNewStaff({...newStaff, permissions: {...newStaff.permissions!, registerManagement: !newStaff.permissions?.registerManagement}})} />
                       <PermissionToggle label="Open / Close Control" active={newStaff.permissions?.statusControl || false} onToggle={() => setNewStaff({...newStaff, permissions: {...newStaff.permissions!, statusControl: !newStaff.permissions?.statusControl}})} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] border-b pb-2 mb-4">Shift Eligibility</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {(userShop?.shifts || []).map(shift => (
-                        <button 
-                          key={shift.id}
-                          onClick={() => {
-                            const current = newStaff.assignedShifts || [];
-                            const updated = current.includes(shift.id) ? current.filter(id => id !== shift.id) : [...current, shift.id];
-                            setNewStaff({...newStaff, assignedShifts: updated});
-                          }}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${newStaff.assignedShifts?.includes(shift.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100'}`}
-                        >
-                          {shift.name} ({shift.start}-{shift.end})
-                        </button>
-                      ))}
-                      {(!userShop?.shifts || userShop.shifts.length === 0) && <p className="text-[10px] font-bold text-slate-300 italic">No shifts in library. Create them first.</p>}
                     </div>
                   </div>
                 </div>
