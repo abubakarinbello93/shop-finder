@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, addDoc, updateDoc, doc, onSnapshot, query, deleteDoc, getDocs, getDoc, setDoc, where, orderBy, limit, writeBatch } from 'firebase/firestore';
@@ -12,7 +13,8 @@ import ForgotPasswordPage from './ForgotPasswordPage';
 import Dashboard from './Dashboard';
 import ServicesPage from './ServicesPage';
 import AvailablePage from './AvailablePage';
-import SettingsPage from './settiingspage';
+// Corrected casing to match SettingsPage.tsx
+import SettingsPage from './SettingsPage';
 import FavoritesPage from './FavoritesPage';
 import HistoryPage from './HistoryPage';
 import AdminDashboard from './AdminDashboard';
