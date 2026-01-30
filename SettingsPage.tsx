@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Lock, Users, Save, X, Plus, Trash2, Calendar, UserPlus, ChevronRight, Check, ArrowLeft, AlertCircle, Eye, EyeOff } from 'lucide-react';
@@ -229,7 +230,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ state, onLogout, onUpdateSh
       {/* Password Modal */}
       {activeModal === 'password' && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden p-8">
+          <div className="bg-white w-full max-md rounded-[32px] shadow-2xl overflow-hidden p-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">Security</h2>
               <button onClick={() => setActiveModal(null)} className="p-2 bg-gray-50 border rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"><X className="h-5 w-5" /></button>
